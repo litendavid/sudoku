@@ -160,7 +160,18 @@ test("candidate removal",function(){
 	equals(typeof board.blockCandInSquare,"function","Board has blockCandInSquare function");
 	ok(Array.locate(sqrid,row.candpositions[cand],sqrid) && Array.locate(sqrid,col.candpositions[cand],sqrid) && Array.locate(sqrid,box.candpositions[cand],sqrid),"square is possible position for cand in all its houses");
 	equals(square.candList.cands[cand],1,"square can be cand");
-	board.blockCandInSquare(cand,sqrid);
+	ok(board.blockCandInSquare(cand,sqrid),"blocking returns true");
 	ok(Array.locate(sqrid,row.candpositions[cand],sqrid) == -1 && Array.locate(sqrid,col.candpositions[cand],sqrid) == -1 && Array.locate(sqrid,box.candpositions[cand],sqrid) == -1,"square is removed as candpossibility in all its houses");
 	equals(square.candList.cands[cand],0,"square can no longer be cand");
+	ok(!board.blockCandInSquare(cand,sqrid),"subsequent removal returns false");
+});
+
+test("answering a square",function(){
+	var board = new SS.Board("someid"), sqrid = "r5c5", cand = 3, square = board.squares[sqrid], 
+		row = board.houses[square.row], col = board.houses[square.col], box = board.houses[square.box];
+	equals(typeof board.answerSquare,"function","Board has answerSquare function");
+	ok(board.answerSquare(cand,sqrid),"answering returns true");
+	equal(square.answer,cand,"Square is now answered as cand");
+	ok(Array.compare(square.candList.cands,[666,0,0,0,0,0,0,0,0,0],"square now has empty candlist"));
+	
 });

@@ -436,10 +436,11 @@ if (!Array.remove){
 	 * @returns {bool} whether or not cand was answered (might not be available in square)
 	 */
 	Board.answerSquare = function(board,cand,sqrid){
-		var square = board.squares[sqrid],row = board.houses[square.row], col = board.houses[square.col], box = board.houses[square.box];
+		var square = board.squares[sqrid], row = board.houses[square.row], col = board.houses[square.col], box = board.houses[square.box];
 		if (!square.candList.cands[cand] || square.answer){
 			return false;
 		}
+		console.log(square,row,col,box);
 		// update the square
 		square.candList = new CandList([666,0,0,0,0,0,0,0,0,0]);
 		square.answer = cand;
