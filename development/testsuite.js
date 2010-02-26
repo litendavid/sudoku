@@ -134,12 +134,12 @@ test("instantiation",function(){
 	ok($.isArray(h.squares),"house contains squares array");
 });
 
-/**************/ module("Boardgenerator"); /*********************************************/
+/**************/ module("Board"); /*********************************************/
 
 test("board generation",function(){
-	equals(typeof SS.generateBoard, "function", "Generate function exists");
-	var board = SS.generateBoard();
-	equals(typeof board, "object", "Returns an object");
+	var board = new SS.Board("domid");
+	ok(board instanceof SS.Board,"Board is constructor");
+	equals(board.selector,"domid","selection property was correctly set");
 	equals(typeof board.squares, "object", "Contains square object");
 	equals(typeof board.houses, "object", "Contains houses object");
 	equals(typeof board.moves, "object", "Contains moves object");
@@ -152,4 +152,15 @@ test("board generation",function(){
 	ok(Array.compare(house.squares,["r1c1","r1c2","r1c3","r1c4","r1c5","r1c6","r1c7","r1c8","r1c9"]),"house has been given correct squares");
 	ok(Array.compare(house.squares,house.candpositions[1]),"candpositions are all squares");
 	ok(Array.compare(sqr.neighbours,["r1c2","r1c3","r1c4","r1c5","r1c6","r1c7","r1c8","r1c9","r2c1","r3c1","r4c1","r5c1","r6c1","r7c1","r8c1","r9c1","r2c2","r2c3","r3c2","r3c3"]),"square has been given correct neighbours");
+});
+
+test("candidate removal",function(){
+	var board = new SS.Board("someid"), sqrid = "r5c5", cand = 3, square = board.squares[sqrid], 
+		row = board.houses[square.row], col = board.houses[square.col], box = board.houses[square.box];
+	equals(typeof board.blockCandInSquare,"function","Board has blockCandInSquare function");
+	ok(Array.locate(sqrid,row.candpositions[cand],sqrid) && Array.locate(sqrid,col.candpositions[cand],sqrid) && Array.locate(sqrid,box.candpositions[cand],sqrid),"square is possible position for cand in all its houses");
+	equals(square.candList.cands[cand],1,"square can be cand");
+	board.blockCandInSquare(cand,sqrid);
+	ok(Array.locate(sqrid,row.candpositions[cand],sqrid) == -1 && Array.locate(sqrid,col.candpositions[cand],sqrid) == -1 && Array.locate(sqrid,box.candpositions[cand],sqrid) == -1,"square is removed as candpossibility in all its houses");
+	equals(square.candList.cands[cand],0,"square can no longer be cand");
 });

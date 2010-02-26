@@ -267,23 +267,33 @@ if (!Array.remove){
 	
 	/**
 	 * returns the CSS class string, which depends on available cands
+	 * @name Square#getClass
 	 * @returns {string} the CSS class
 	 */
 	Square.prototype.getClass = function(){
+		return Square.getClass(this);
+	};
+	
+	/**
+	 * Static version, CSS class string, which depends on available cands
+	 * @param {Square} square the square to work with
+	 * @returns {string} the CSS class
+	 */
+	Square.getClass = function(square){
 		var ret = "";
-		if (!this.answered) {
+		if (!square.answer) {
 			for (var i = 0; ++i < 10;) {
-				if (this.candList.cands[i]) {
+				if (square.candList.cands[i]) {
 					ret += "canbe" + i + " ";
 				}
 			}
 		}
 		else {
-			ret = "answered is"+this.answered;
+			ret = "answered is"+square.answer;
 		}
 		return ret.substr(0,ret.length-1);
 	};
-	
+
 	SS.Square = Square;
 
 	
@@ -333,6 +343,143 @@ if (!Array.remove){
 	
 	SS.House = House;
 
+/******************************** Board class ***************************************************/	
+
+	/**
+	 * @constructor
+	 * @name Board
+	 * @class a board object
+	 * @param {string} selector The ID of the wrapper for the DOM representation
+	 */
+	var Board = function(selector){
+		if (selector) {
+			this.selector = selector;
+		}
+		this.squares = {};
+		this.moves = {};
+		this.selection = {};
+		this.houses = {};
+
+		for (var h = 1; h < 10; h++) {
+			this.houses["r" + h] = new SS.House("r"+h);
+			this.houses["c" + h] = new SS.House("c"+h);
+			this.houses["b" + h] = new SS.House("b"+h);
+		}
+		for (var r = 1; r < 10; r++) {
+			for (var c = 1; c < 10; c++) {
+				var s = new SS.Square(r,c); 
+				this.squares[s.id] = s;
+				this.houses[s.row].squares.push(s.id);
+				this.houses[s.col].squares.push(s.id);
+				this.houses[s.box].squares.push(s.id);
+			}
+		}
+		for (h in this.houses) {
+			for (c = 1; c < 10; c++) {
+				this.houses[h].candpositions[c] = this.houses[h].squares;
+			}
+			for (s in this.houses[h].squares) {
+				Array.merge(this.squares[this.houses[h].squares[s]].neighbours, this.houses[h].squares);
+			}
+		}
+		for (s in this.squares) {
+			Array.remove(s, this.squares[s].neighbours);
+		}
+	};
+	
+	/**
+	 * Blocks a candidate in a square
+	 * @name Board#blockCandInSquare
+	 * @param {int} cand candidate to block
+	 * @param {string} sqrid id of square to block cand in
+	 * @returns {bool} whether or not cand was removed (might already have been removed)
+	 */
+	Board.prototype.blockCandInSquare = function(cand,sqrid){
+		return Board.blockCandInSquare(this,cand,sqrid);
+	};
+	
+	/**
+	 * Static version, blocks a candidate in a square
+	 * @param {Board} board The board to work with
+	 * @param {int} cand candidate to block
+	 * @param {string} sqrid id of square to block cand in
+	 * @returns {bool} whether or not cand was removed (might already have been removed)
+	 */
+	Board.blockCandInSquare = function(board,cand,sqrid){
+		var square = board.squares[sqrid], res = CandList.remove(square.candList,cand);
+		if (!res){
+			return false;
+		}
+		Array.remove(sqrid,board.houses[square.row].candpositions[cand]);
+		Array.remove(sqrid,board.houses[square.col].candpositions[cand]);
+		Array.remove(sqrid,board.houses[square.box].candpositions[cand]);
+		Board.updateSquare(board,sqrid);
+		return true;
+	};
+
+	/**
+	 * Sets a square to a candidate, answering it
+	 * @name Board#answerSquare
+	 * @param {int} cand candidate to set
+	 * @param {string} sqrid id of square to answer cand in
+	 * @returns {bool} whether or not cand was answered (might not be available in square)
+	 */
+	Board.prototype.answerSquare = function(cand, sqrid){
+		return Board.answerSquare(this,cand,sqrid);
+	};
+
+	/**
+	 * Static version, sets a square to a candidate, answering it
+	 * @param {Board} board The board to work with
+	 * @param {int} cand candidate to set
+	 * @param {string} sqrid id of square to answer cand in
+	 * @returns {bool} whether or not cand was answered (might not be available in square)
+	 */
+	Board.answerSquare = function(board,cand,sqrid){
+		var square = board.squares[sqrid],row = board.houses[square.row], col = board.houses[square.col], box = board.houses[square.box];
+		if (!square.candList.cands[cand] || square.answer){
+			return false;
+		}
+		// update the square
+		square.candList = new CandList([666,0,0,0,0,0,0,0,0,0]);
+		square.answer = cand;
+		Board.updateSquare(board,sqrid);
+		// update the houses
+		row.candpositions[cand] = [sqrid];
+		col.candpositions[cand] = [sqrid];
+		box.candpositions[cand] = [sqrid];
+		CandList.add(row.answeredCands,cand);
+		CandList.add(col.answeredCands,cand);
+		CandList.add(box.answeredCands,cand);
+		// update the neighbours
+		for(var nid in square.neighbours){
+			Board.blockCandInSquare(board,cand,square.neighbours[nid]);
+		}
+		return true;
+	};
+	
+	
+	
+	/**
+	 * Updates DOM representation of a square
+	 * @name Board#updateSquare
+	 * @param {string} sqrid id of the square to update
+	 */
+	Board.prototype.updateSquare = function(sqrid){
+		return Board.updateSquare(this,sqrid);
+	};
+	
+	/**
+	 * Static version, updates DOM representation of a square
+	 * @param {Board} board
+	 * @param {string} sqrid
+	 */
+	Board.updateSquare = function(board,sqrid){
+		var square = board.squares[sqrid], newclass = Square.getClass(square);
+	};
+	
+	SS.Board = Board;
+
 /****************************** Methods **************************************************/
 
     /**
@@ -343,43 +490,7 @@ if (!Array.remove){
 		
 	};
 	
-	/**
-	 * generates board data structure
-	 */
-	SS.generateBoard = function(){
-		var board = {
-			squares: {},
-			moves: {},
-			selection: {},
-			houses: {}
-		}; 
-		for (var h = 1; h < 10; h++) {
-			board.houses["r" + h] = new SS.House("r"+h);
-			board.houses["c" + h] = new SS.House("c"+h);
-			board.houses["b" + h] = new SS.House("b"+h);
-		}
-		for (var r = 1; r < 10; r++) {
-			for (var c = 1; c < 10; c++) {
-				var s = new SS.Square(r,c); 
-				board.squares[s.id] = s;
-				board.houses[s.row].squares.push(s.id);
-				board.houses[s.col].squares.push(s.id);
-				board.houses[s.box].squares.push(s.id);
-			}
-		}
-		for (h in board.houses) {
-			for (c = 1; c < 10; c++) {
-				board.houses[h].candpositions[c] = board.houses[h].squares;
-			}
-			for (s in board.houses[h].squares) {
-				Array.merge(board.squares[board.houses[h].squares[s]].neighbours, board.houses[h].squares);
-			}
-		}
-		for (s in board.squares) {
-			Array.remove(s, board.squares[s].neighbours);
-		}
-		return board;
-	};
+
 	
 	
 	
