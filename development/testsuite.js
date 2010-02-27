@@ -55,6 +55,7 @@ test("contains classes",function(){
 	equals(typeof SS.CandList,"function","CandList is declared");
 	equals(typeof SS.Square,"function","Square is declared");
 	equals(typeof SS.House,"function","House is declared");
+	equals(typeof SS.Board,"function","Board is declared");
 });
 
 /**************/ module("CandList"); /*******************************************************/
@@ -113,11 +114,13 @@ test("instantiation",function(){
 });
 
 test("classname generation",function(){
-	var s = new SS.Square();
+	var s = new SS.Square(1,1);
 	equals(typeof s.getClass,"function","Square has a getClass function");
-	equals(s.getClass(),"canbe1 canbe2 canbe3 canbe4 canbe5 canbe6 canbe7 canbe8 canbe9","Starts with 'full' classname");
+	equals(s.getClass(),"r1 c1 b1 canbe1 canbe2 canbe3 canbe4 canbe5 canbe6 canbe7 canbe8 canbe9","Starts with 'full' classname");
 	s.candList.remove(6);
-	equals(s.getClass(),"canbe1 canbe2 canbe3 canbe4 canbe5 canbe7 canbe8 canbe9","Doesn't include removed classes");
+	equals(s.getClass(),"r1 c1 b1 canbe1 canbe2 canbe3 canbe4 canbe5 canbe7 canbe8 canbe9","Doesn't include removed classes");
+	s.answer = 5;
+	equals(s.getClass(),"r1 c1 b1 answered answer5","Answered square has special class");
 });
 
 
@@ -155,7 +158,7 @@ test("board generation",function(){
 });
 
 test("candidate removal",function(){
-	var board = new SS.Board("someid"), sqrid = "r5c5", cand = 3, square = board.squares[sqrid], 
+	var board = new SS.Board("#board"), sqrid = "r5c5", cand = 3, square = board.squares[sqrid], 
 		row = board.houses[square.row], col = board.houses[square.col], box = board.houses[square.box];
 	equals(typeof board.blockCandInSquare,"function","Board has blockCandInSquare function");
 	ok(Array.locate(sqrid,row.candpositions[cand],sqrid) && Array.locate(sqrid,col.candpositions[cand],sqrid) && Array.locate(sqrid,box.candpositions[cand],sqrid),"square is possible position for cand in all its houses");
@@ -167,11 +170,19 @@ test("candidate removal",function(){
 });
 
 test("answering a square",function(){
-	var board = new SS.Board("someid"), sqrid = "r5c5", cand = 3, square = board.squares[sqrid], 
+	var board = new SS.Board("#board"), sqrid = "r5c5", cand = 3, square = board.squares[sqrid], 
 		row = board.houses[square.row], col = board.houses[square.col], box = board.houses[square.box];
 	equals(typeof board.answerSquare,"function","Board has answerSquare function");
 	ok(board.answerSquare(cand,sqrid),"answering returns true");
 	equal(square.answer,cand,"Square is now answered as cand");
 	ok(Array.compare(square.candList.cands,[666,0,0,0,0,0,0,0,0,0],"square now has empty candlist"));
-	
+});
+
+test("setting a sudoku",function(){
+	var b = new SS.Board("#board"),sudoku = "800000000000000000000000000000000000000070000000000000000000000000000000000000001";
+	equals(typeof b.set,"function","Board has set function");
+	b.set(sudoku);
+	equals(b.squares.r1c1.answer,8,"first square was correctly set");
+	equals(b.squares.r5c5.answer,7,"middle square was correctly set");
+	equals(b.squares.r9c9.answer,1,"last square was correctly set");
 });

@@ -157,25 +157,25 @@ if (!Array.remove){
 	};
 	
 	// private function
-	var changeCandList = function(cand,to){
+	var changeCandList = function(list,cand,to){
 		var changed = 0;
 		if (cand.length){
 			for(var i=10;--i;){
 				if (cand[i]) {
-					if (to != this.cands[i]) {
-						this.cands[i] = to;
+					if (to != list.cands[i]) {
+						list.cands[i] = to;
 						changed++;
 					}
 				}
 			}
 		}
 		else {
-			if (to != this.cands[cand]){
-				this.cands[cand] = to;
+			if (to != list.cands[cand]){
+				list.cands[cand] = to;
 				changed = 1;
 			}
 		}
-		this.nbrCands += (to ? 1 : -1)*changed;
+		list.nbrCands += (to ? 1 : -1)*changed;
 		return changed;
 	};
 	
@@ -185,7 +185,7 @@ if (!Array.remove){
 	 * @returns {int} number of cands added
 	 */
 	CandList.prototype.add = function(cand){
-		return changeCandList.apply(this,[cand,1]);
+		return changeCandList(this,cand,1);
 	};
 	
 	/**
@@ -194,7 +194,7 @@ if (!Array.remove){
 	 * @returns {int} number of cands removed
 	 */
 	CandList.prototype.remove = function(cand){
-		return changeCandList.apply(this,[cand,0]);
+		return changeCandList(this,cand,0);
 	};
 	/**
 	 * static version to set cand as 1 in list
@@ -203,7 +203,7 @@ if (!Array.remove){
 	 * @returns {int} number of cands added
 	 */
 	CandList.add = function(list,cand){
-		return changeCandList.apply(list,[cand,1]);
+		return changeCandList(list,cand,1);
 	};
 	/**
 	 * static version to set cand as 0 in list
@@ -212,7 +212,7 @@ if (!Array.remove){
 	 * @returns {int} number of cands removed
 	 */
 	CandList.remove = function(list,cand){
-		return changeCandList.apply(list,[cand,0]);
+		return changeCandList(list,cand,0);
 	};
 	
 	SS.CandList = CandList;
@@ -267,7 +267,6 @@ if (!Array.remove){
 	
 	/**
 	 * returns the CSS class string, which depends on available cands
-	 * @name Square#getClass
 	 * @returns {string} the CSS class
 	 */
 	Square.prototype.getClass = function(){
@@ -280,18 +279,19 @@ if (!Array.remove){
 	 * @returns {string} the CSS class
 	 */
 	Square.getClass = function(square){
-		var ret = "";
+		var ret = square.row+" "+square.col+" "+square.box+" ";
 		if (!square.answer) {
 			for (var i = 0; ++i < 10;) {
 				if (square.candList.cands[i]) {
 					ret += "canbe" + i + " ";
 				}
 			}
+			ret = ret.substr(0,ret.length-1);
 		}
 		else {
-			ret = "answered is"+square.answer;
+			ret += "answered answer"+square.answer;
 		}
-		return ret.substr(0,ret.length-1);
+		return ret;
 	};
 
 	SS.Square = Square;
@@ -389,7 +389,6 @@ if (!Array.remove){
 	
 	/**
 	 * Blocks a candidate in a square
-	 * @name Board#blockCandInSquare
 	 * @param {int} cand candidate to block
 	 * @param {string} sqrid id of square to block cand in
 	 * @returns {bool} whether or not cand was removed (might already have been removed)
@@ -406,8 +405,8 @@ if (!Array.remove){
 	 * @returns {bool} whether or not cand was removed (might already have been removed)
 	 */
 	Board.blockCandInSquare = function(board,cand,sqrid){
-		var square = board.squares[sqrid], res = CandList.remove(square.candList,cand);
-		if (!res){
+		var square = board.squares[sqrid];
+		if (!CandList.remove(square.candList,cand)){
 			return false;
 		}
 		Array.remove(sqrid,board.houses[square.row].candpositions[cand]);
@@ -419,7 +418,6 @@ if (!Array.remove){
 
 	/**
 	 * Sets a square to a candidate, answering it
-	 * @name Board#answerSquare
 	 * @param {int} cand candidate to set
 	 * @param {string} sqrid id of square to answer cand in
 	 * @returns {bool} whether or not cand was answered (might not be available in square)
@@ -440,7 +438,6 @@ if (!Array.remove){
 		if (!square.candList.cands[cand] || square.answer){
 			return false;
 		}
-		console.log(square,row,col,box);
 		// update the square
 		square.candList = new CandList([666,0,0,0,0,0,0,0,0,0]);
 		square.answer = cand;
@@ -463,7 +460,6 @@ if (!Array.remove){
 	
 	/**
 	 * Updates DOM representation of a square
-	 * @name Board#updateSquare
 	 * @param {string} sqrid id of the square to update
 	 */
 	Board.prototype.updateSquare = function(sqrid){
@@ -477,22 +473,36 @@ if (!Array.remove){
 	 */
 	Board.updateSquare = function(board,sqrid){
 		var square = board.squares[sqrid], newclass = Square.getClass(square);
+		$("#"+sqrid,board.selector)[0].className = newclass;
+	};
+	
+	/**
+	 * parses a sudoku string and sets all initial squares
+	 * @param {Board} board the board to work with
+	 * @param {string} sudoku a string representation of the sudoku, empty squares 0
+	 */
+	Board.set = function(board,sudoku) {
+		var i, n;
+		for(i = 0;i<81;i++){
+			n = Number(sudoku[i]);
+			if (n){
+				Board.answerSquare(board,n,"r"+(Math.floor((i)/9)+1)+"c"+((i)%9+1));
+			}
+		}
+	};
+	
+	/**
+	 * parses a sudoku string and sets all initial squares
+	 * @param {string} sudoku a string representation of the sudoku, empty squares 0
+	 */
+	Board.prototype.set = function(sudoku){
+		return Board.set(this,sudoku);
 	};
 	
 	SS.Board = Board;
 
 /****************************** Methods **************************************************/
 
-    /**
-     * takes a sudoku as a string and preps the board
-     * @param {Object} sudoku A string containing the sudoku initial squares
-     */
-    SS.set = function(sudoku){
-		
-	};
-	
-
-	
 	
 	
 /******************************** exposure ******************************************************/
