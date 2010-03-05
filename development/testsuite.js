@@ -270,14 +270,17 @@ test("board generation",function(){
 
 test("candidate blocking",function(){
 	var board = new SS.Board("#board"), sqrid = "r5c5", cand = 3, square = board.squares[sqrid], 
-		row = board.houses[square.row], col = board.houses[square.col], box = board.houses[square.box];
+		row = board.houses[square.row], col = board.houses[square.col], box = board.houses[square.box],
+		turn = 666;
+	board.currentTurn = turn;
 	equals(typeof board.blockCandInSquare,"function","Board has blockCandInSquare function");
-	ok(Array.locate(sqrid,row.candPositions[cand],sqrid) && Array.locate(sqrid,col.candPositions[cand],sqrid) && Array.locate(sqrid,box.candPositions[cand],sqrid),"square is possible position for cand in all its houses");
-	equals(square.candList.cands[cand],1,"square can be cand");
+	ok(!row.candPositions[cand][sqrid] && !col.candPositions[cand][sqrid] && !box.candPositions[cand][sqrid],"square is possible position for cand in all its houses");
 	ok(board.blockCandInSquare(cand,sqrid),"blocking returns true");
-	ok(Array.locate(sqrid,row.candPositions[cand],sqrid) == -1 && Array.locate(sqrid,col.candPositions[cand],sqrid) == -1 && Array.locate(sqrid,box.candPositions[cand],sqrid) == -1,"square is removed as candpossibility in all its houses");
-	equals(square.candList.cands[cand],0,"square can no longer be cand");
+	equals(row.candPositions[cand][sqrid],turn,"square is blocked at this turn in its row");
+	equals(col.candPositions[cand][sqrid],turn,"square is blocked at this turn in its col");
+	equals(box.candPositions[cand][sqrid],turn,"square is blocked at this turn in its box");
 	ok(!board.blockCandInSquare(cand,sqrid),"subsequent removal returns false");
+	equals(typeof SS.Board.blockCandInSquare,"function","There is static version of blockCandInSquare function");	
 });
 
 test("answering a square",function(){
@@ -292,9 +295,13 @@ test("answering a square",function(){
 test("setting a sudoku",function(){
 	var b = new SS.Board("#board"),sudoku = "800000000000000000000000000000000000000070000000000000000000000000000000000000001";
 	equals(typeof b.set,"function","Board has set function");
+	equals(b.currentTurn,-1,"Turn is -1 to begin");
 	b.set(sudoku);
+	equals(b.currentTurn,1,"Turn is 1 after setting of sudoku");
 	equals(b.squares.r1c1.answeredCand,8,"first square was correctly set");
 	equals(b.squares.r5c5.answeredCand,7,"middle square was correctly set");
 	equals(b.squares.r9c9.answeredCand,1,"last square was correctly set");
-	ok(b.squares.r1c1.answeredTurn == b.squares.r5c5.answeredTurn == b.squares.r9c9.answeredTurn == -1,"answeredTurn for all squares was set to -1");
+	equals(b.squares.r1c1.answeredTurn,-1,"first square answerTurn is -1");
+	equals(b.squares.r5c5.answeredTurn,-1,"middle square answerTurn is -1");
+	equals(b.squares.r9c9.answeredTurn,-1,"last square answerTurn is -1");
 });

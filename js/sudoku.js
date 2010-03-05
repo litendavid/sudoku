@@ -548,7 +548,7 @@ if (!Array.remove){
 		this.moves = {};
 		this.selection = {};
 		this.houses = {};
-		this.currentTurn = 1;
+		this.currentTurn = -1;
 
 		for (var h = 1; h < 10; h++) {
 			this.houses["r" + h] = new SS.House("r"+h);
@@ -592,16 +592,13 @@ if (!Array.remove){
 	 * @returns {bool} whether or not cand was removed (might already have been removed)
 	 */
 	Board.blockCandInSquare = function(board,cand,sqrid){
-		var square = board.squares[sqrid], turn = 666;
-		if (!CandList.remove(square.candList,cand)){
+		var square = board.squares[sqrid], turn = board.currentTurn;
+		if (!Square.block(square,cand,turn)){
 			return false;
 		}
-		board.houses[square.row].candPositions[cand][sqrid] = turn;
-		board.houses[square.row].candPositions[cand][sqrid] = turn;
-		board.houses[square.row].candPositions[cand][sqrid] = turn;
-		Array.remove(sqrid,board.houses[square.row].candPositions[cand]);
-		Array.remove(sqrid,board.houses[square.col].candPositions[cand]);
-		Array.remove(sqrid,board.houses[square.box].candPositions[cand]);
+		House.block(board.houses[square.row],cand,turn,sqrid);
+		House.block(board.houses[square.col],cand,turn,sqrid);
+		House.block(board.houses[square.box],cand,turn,sqrid);
 		Board.updateSquare(board,sqrid);
 		return true;
 	};
@@ -624,21 +621,18 @@ if (!Array.remove){
 	 * @returns {bool} whether or not cand was answered (might not be available in square)
 	 */
 	Board.answerSquare = function(board,cand,sqrid){
-		var square = board.squares[sqrid], row = board.houses[square.row], col = board.houses[square.col], box = board.houses[square.box];
-		if (!square.candList.cands[cand] || square.answer){
+		var square = board.squares[sqrid], row = board.houses[square.row], col = board.houses[square.col], box = board.houses[square.box],
+		    turn = board.currentTurn;
+		if (square.answeredCand || (square.candList.cands[cand] && square.candList.cands[cand] <= turn)){
 			return false;
 		}
 		// update the square
-		square.candList = new CandList([666,0,0,0,0,0,0,0,0,0]);
-		square.answer = cand;
+		Square.answer(square,cand,turn);
 		Board.updateSquare(board,sqrid);
 		// update the houses
-		row.candPositions[cand] = [sqrid];
-		col.candPositions[cand] = [sqrid];
-		box.candPositions[cand] = [sqrid];
-		CandList.add(row.answeredCands,cand);
-		CandList.add(col.answeredCands,cand);
-		CandList.add(box.answeredCands,cand);
+		House.answer(board.houses[square.row],cand,turn,sqrid);
+		House.answer(board.houses[square.col],cand,turn,sqrid);
+		House.answer(board.houses[square.box],cand,turn,sqrid);
 		// update the neighbours
 		for(var nid in square.neighbours){
 			Board.blockCandInSquare(board,cand,square.neighbours[nid]);
@@ -673,12 +667,14 @@ if (!Array.remove){
 	 */
 	Board.set = function(board,sudoku) {
 		var i, n;
+		board.currentTurn = -1;
 		for(i = 0;i<81;i++){
 			n = Number(sudoku[i]);
 			if (n){
 				Board.answerSquare(board,n,"r"+(Math.floor((i)/9)+1)+"c"+((i)%9+1));
 			}
 		}
+		board.currentTurn = 1;
 	};
 	
 	/**
