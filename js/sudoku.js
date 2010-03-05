@@ -144,76 +144,74 @@ if (!Array.remove){
 		 * @name CandList#cands
 		 * @type array
 		 */
-		this.cands = (cands ? cands : [666,1,1,1,1,1,1,1,1,1]);
+		this.cands = (cands ? cands : [666,0,0,0,0,0,0,0,0,0]);
 		/**
-		 * number of remaining candidates
-		 * @name CandList#nbrCands
+		 * number of blocked candidates
+		 * @name CandList#nbrBlocked
 		 * @type int
 		 */
-		this.nbrCands = 0;
+		this.nbrBlocked = 0;
 		for(var i=10;--i;){
-			this.nbrCands += this.cands[i];
+			this.nbrBlocked += (this.cands[i] ? 1 : 0);
 		}
 	};
 	
-	// private function
-	var changeCandList = function(list,cand,to){
-		var changed = 0;
-		if (cand.length){
-			for(var i=10;--i;){
-				if (cand[i]) {
-					if (to != list.cands[i]) {
-						list.cands[i] = to;
-						changed++;
-					}
-				}
+	/**
+	 * blocks a candidate, setting it to the given turn number
+	 * @param {int} cand The candidate to block
+	 * @param {int} turn The turn number to set it to
+	 * @returns {boolean} Whether or not the cand was blocked
+	 */
+	CandList.prototype.block = function(cand,turn){
+		return CandList.block(this,cand,turn);
+	};
+	
+	/**
+	 * blocks a candidate, setting it to the given turn number
+	 * @param {CandList} list The CandList to operate on
+	 * @param {int} cand The candidate to block
+	 * @param {int} turn The turn number to set it to
+	 * @returns {boolean} Whether or not the cand was blocked
+	 */	
+	CandList.block = function(list,cand,turn){
+		if (list.cands[cand] && list.cands[cand] <= turn){
+			return false;
+		}
+		list.cands[cand] = turn;
+		list.nbrBlocked = 0;
+		for(var i=10;--i;){
+			list.nbrBlocked += (list.cands[i] ? 1 : 0);
+		}
+		return true;
+	};
+	
+	/**
+	 * reverts status back to a given turn
+	 * @param {int} turn The turn number to revert it to
+	 * @returns {boolean} Whether or not the revert meant any changes
+	 */	
+	CandList.prototype.revert = function(turn){
+		return CandList.revert(this,turn);
+	};
+	
+	/**
+	 * Static version, reverts status back to a given turn
+	 * @param {CandList} list The CandList to operate on
+	 * @param {int} turn The turn number to revert it to
+	 * @returns {boolean} Whether or not the revert meant any changes
+	 */	
+	CandList.revert = function(list,turn){
+		var oldNbrBlocked = list.nbrBlocked;
+		list.nbrBlocked = 0;
+		for(var i=10;--i;){
+			if (list.cands[i]>turn){
+				list.cands[i] = 0;
 			}
+			list.nbrBlocked += (list.cands[i] ? 1 : 0);
 		}
-		else {
-			if (to != list.cands[cand]){
-				list.cands[cand] = to;
-				changed = 1;
-			}
-		}
-		list.nbrCands += (to ? 1 : -1)*changed;
-		return changed;
+		return list.nbrBlocked != oldNbrBlocked;
 	};
 	
-	/**
-	 * sets a candidate as 1 in the list
-	 * @param {int|array} single or list of candidates
-	 * @returns {int} number of cands added
-	 */
-	CandList.prototype.add = function(cand){
-		return changeCandList(this,cand,1);
-	};
-	
-	/**
-	 * sets a candidate as 0 in the list
-	 * @param {int|array} single or list of candidates
-	 * @returns {int} number of cands removed
-	 */
-	CandList.prototype.remove = function(cand){
-		return changeCandList(this,cand,0);
-	};
-	/**
-	 * static version to set cand as 1 in list
-	 * @param {CandList} list the CandList to work with
-	 * @param {int|array} cand single or list of candidates
-	 * @returns {int} number of cands added
-	 */
-	CandList.add = function(list,cand){
-		return changeCandList(list,cand,1);
-	};
-	/**
-	 * static version to set cand as 0 in list
-	 * @param {CandList} list the CandList to work with
-	 * @param {int|array} cand single or list of candidates
-	 * @returns {int} number of cands removed
-	 */
-	CandList.remove = function(list,cand){
-		return changeCandList(list,cand,0);
-	};
 	
 	SS.CandList = CandList;
 	
@@ -280,19 +278,95 @@ if (!Array.remove){
 	 */
 	Square.getClass = function(square){
 		var ret = square.row+" "+square.col+" "+square.box+" ";
-		if (!square.answer) {
+		if (!square.answeredCand) {
 			for (var i = 0; ++i < 10;) {
-				if (square.candList.cands[i]) {
+				if (!square.candList.cands[i]) {
 					ret += "canbe" + i + " ";
 				}
 			}
 			ret = ret.substr(0,ret.length-1);
 		}
 		else {
-			ret += "answered answer"+square.answer;
+			ret += "answered answer"+square.answeredCand;
 		}
 		return ret;
 	};
+
+	/**
+	 * blocks a candidate, setting it to the given turn number
+	 * @param {int} cand The candidate to block
+	 * @param {int} turn The turn number to set it to
+	 * @returns {boolean} Whether or not the cand was blocked
+	 */
+	Square.prototype.block = function(cand,turn){
+		return Square.block(this,cand,turn);
+	};
+	
+	/**
+	 * blocks a candidate, setting it to the given turn number
+	 * @param {Square} square The Square to operate on
+	 * @param {int} cand The candidate to block
+	 * @param {int} turn The turn number to set it to
+	 * @returns {boolean} Whether or not the cand was blocked
+	 */	
+	Square.block = function(square,cand,turn){
+		if (square.answeredCand && square.answeredTurn <= turn){
+			return false;
+		}
+		return CandList.block(square.candList,cand,turn);
+	};
+	
+	/**
+	 * reverts status back to a given turn
+	 * @param {int} turn The turn number to revert it to
+	 * @returns {boolean} Whether or not the revert meant any changes
+	 */	
+	Square.prototype.revert = function(turn){
+		return Square.revert(this,turn);
+	};
+	
+	/**
+	 * Static version, reverts status back to a given turn
+	 * @param {Square} list The Square to operate on
+	 * @param {int} turn The turn number to revert it to
+	 * @returns {boolean} Whether or not the revert meant any changes
+	 */	
+	Square.revert = function(square,turn){
+		var oldAnsweredTurn = square.answeredTurn;
+		if (square.answeredTurn>turn){
+			square.answeredTurn = 0;
+			square.answeredCand = 0;
+		}
+		return CandList.revert(square.candList,(turn)) || (oldAnsweredTurn && !square.answeredTurn);
+	};
+
+	/**
+	 * Sets square answer as given candidate at given turn
+	 * @param {int} cand The cand to set it to
+	 * @param {int} turn The turn number to revert it to
+	 * @returns {boolean} Whether or not the answering was successfull
+	 */	
+	Square.prototype.answer = function(cand,turn){
+		return Square.answer(this,cand,turn);
+	};
+	
+	/**
+	 * Static version, sets square answer as given candidate at given turn
+	 * @param {Square} square The square to operate on
+	 * @param {int} cand The cand to set it to
+	 * @param {int} turn The turn number to revert it to
+	 * @returns {boolean} Whether or not the answering was successfull
+	 */	
+	Square.answer = function(square,cand,turn){
+		if (square.answeredTurn <= turn || (square.candList.cands[cand] && square.candList.cands[cand] <= turn)){
+			return false;
+		}
+		square.answeredTurn = turn;
+		square.answeredCand = cand;
+		return true;
+	};
+
+
 
 	SS.Square = Square;
 
@@ -325,22 +399,137 @@ if (!Array.remove){
 		this.answeredCands = new CandList();
 		/**
 		 * possible positions for the different candidates
-		 * @name House#candpositions
+		 * @name House#candPositions
 		 * @type array
 		 */
-		this.candpositions = {
-			1: [],
-			2: [],
-			3: [],
-			4: [],
-			5: [],
-			6: [],
-			7: [],
-			8: [],
-			9: []
+		this.candPositions = {
+			1: {},
+			2: {},
+			3: {},
+			4: {},
+			5: {},
+			6: {},
+			7: {},
+			8: {},
+			9: {}
 		};
+		/**
+		 * array with square ids for answered cands
+		 * @name House#answerPositions
+		 * @type array
+		 */
+		this.answerPositions = [666,0,0,0,0,0,0,0,0,0];
 	};
 	
+	/**
+	 * Adds a squareid to a house. Only used during board instantiation
+	 * @param {string} sqrid id of square to add
+	 */
+	House.prototype.add = function(sqrid){
+		this.squares.push(sqrid);
+		for(var i=1;i<=9;i++){
+			this.candPositions[i][sqrid] = 0;
+		}
+	};
+	
+	/**
+	 * blocks a candidate in a square, setting it to the given turn number
+	 * @param {int} cand The candidate to block
+	 * @param {int} turn The turn number to set it to
+	 * @param {string} sqrid The id of the square to block cand in
+	 * @returns {boolean} Whether or not the cand was not already blocked
+	 */
+	House.prototype.block = function(cand,turn,sqrid){
+		return House.block(this,cand,turn,sqrid);
+	};
+	
+	/**
+	 * blocks a candidate in a square, setting it to the given turn number
+	 * @param {House} house The house to operate on
+	 * @param {int} cand The candidate to block
+	 * @param {int} turn The turn number to set it to
+	 * @param {string} sqrid The id of the square to block cand in
+	 * @returns {boolean} Whether or not the cand was not already blocked
+	 */
+	House.block = function(house,cand,turn,sqrid){
+		if (house.candPositions[cand][sqrid]){
+			return false;
+		}
+		house.candPositions[cand][sqrid] = turn;
+		return true;
+	};
+	
+	/**
+	 * answers a candidate in a square, setting it to the given turn number
+	 * @param {int} cand The candidate to answer
+	 * @param {int} turn The turn number in which to answer
+	 * @param {string} sqrid The id of the square to answer cand in
+	 * @returns {boolean} Whether or not the cand was not already answered
+	 */
+	House.prototype.answer = function(cand,turn,sqrid){
+		return House.answer(this,cand,turn,sqrid);
+	};
+	
+	/**
+	 * Static version, answers a candidate in a square, setting it to the given turn number
+	 * @param {House} house The house to operate on
+	 * @param {int} cand The candidate to answer
+	 * @param {int} turn The turn number in which to answer
+	 * @param {string} sqrid The id of the square to answer cand in
+	 * @returns {boolean} Whether or not the cand was not already answered
+	 */
+	House.answer = function(house,cand,turn,sqrid){
+		if (house.answeredCands[cand] && house.answeredCands[cand] <= turn){ // already answered for that cand
+			return false;
+		}
+		if (house.candPositions[cand][sqrid] && house.candPositions[cand][sqrid] <= turn){ // cand is blocked in that square
+			return false;
+		}
+		for(var i in house.answerPositions){   // square already answered with some cand
+			if (house.answerPositions[i]===sqrid){
+				return false;
+			}
+		}
+		house.answeredCands[cand] = turn;
+		house.answerPositions[cand] = sqrid;
+		return true;
+	};
+
+	/**
+	 * reverts a House state back to a given turn
+	 * @param {int} turn The turn number to set it to
+	 * @returns {boolean} Whether or not the revert meant any changes
+	 */
+	House.prototype.revert = function(turn){
+		return House.revert(this,turn);
+	};
+	
+	/**
+	 * Static version, reverts a House back to a given turn
+	 * @param {House} house The house to operate on
+	 * @param {int} turn The turn number to set it to
+	 * @returns {boolean} Whether or not the revert meant any changes
+	 */
+	House.revert = function(house,turn){
+		var change = false;
+		for(var i = 1;i<=9;i++){
+			// undo answer for this cand
+			if (house.answeredCands[i] && house.answeredCands[i] > turn){
+				house.answeredCands[i] = 0;
+				house.answerPositions[i] = 0;
+				change = true;
+			}
+			// undo block for this cand
+			for(var s in house.candPositions[i]){
+				if (house.candPositions[i][s] && house.candPositions[i][s] > turn){
+					house.candPositions[i][s] = 0;
+					change = true;
+				}
+			}
+		}
+		return change;
+	};
+
 	SS.House = House;
 
 /******************************** Board class ***************************************************/	
@@ -359,6 +548,7 @@ if (!Array.remove){
 		this.moves = {};
 		this.selection = {};
 		this.houses = {};
+		this.currentTurn = 1;
 
 		for (var h = 1; h < 10; h++) {
 			this.houses["r" + h] = new SS.House("r"+h);
@@ -369,15 +559,12 @@ if (!Array.remove){
 			for (var c = 1; c < 10; c++) {
 				var s = new SS.Square(r,c); 
 				this.squares[s.id] = s;
-				this.houses[s.row].squares.push(s.id);
-				this.houses[s.col].squares.push(s.id);
-				this.houses[s.box].squares.push(s.id);
+				this.houses[s.row].add(s.id);
+				this.houses[s.col].add(s.id);
+				this.houses[s.box].add(s.id);
 			}
 		}
 		for (h in this.houses) {
-			for (c = 1; c < 10; c++) {
-				this.houses[h].candpositions[c] = this.houses[h].squares;
-			}
 			for (s in this.houses[h].squares) {
 				Array.merge(this.squares[this.houses[h].squares[s]].neighbours, this.houses[h].squares);
 			}
@@ -393,7 +580,7 @@ if (!Array.remove){
 	 * @param {string} sqrid id of square to block cand in
 	 * @returns {bool} whether or not cand was removed (might already have been removed)
 	 */
-	Board.prototype.blockCandInSquare = function(cand,sqrid){
+	Board.prototype.blockCandInSquare = function(cand,sqrid,turn){
 		return Board.blockCandInSquare(this,cand,sqrid);
 	};
 	
@@ -405,13 +592,16 @@ if (!Array.remove){
 	 * @returns {bool} whether or not cand was removed (might already have been removed)
 	 */
 	Board.blockCandInSquare = function(board,cand,sqrid){
-		var square = board.squares[sqrid];
+		var square = board.squares[sqrid], turn = 666;
 		if (!CandList.remove(square.candList,cand)){
 			return false;
 		}
-		Array.remove(sqrid,board.houses[square.row].candpositions[cand]);
-		Array.remove(sqrid,board.houses[square.col].candpositions[cand]);
-		Array.remove(sqrid,board.houses[square.box].candpositions[cand]);
+		board.houses[square.row].candPositions[cand][sqrid] = turn;
+		board.houses[square.row].candPositions[cand][sqrid] = turn;
+		board.houses[square.row].candPositions[cand][sqrid] = turn;
+		Array.remove(sqrid,board.houses[square.row].candPositions[cand]);
+		Array.remove(sqrid,board.houses[square.col].candPositions[cand]);
+		Array.remove(sqrid,board.houses[square.box].candPositions[cand]);
 		Board.updateSquare(board,sqrid);
 		return true;
 	};
@@ -443,9 +633,9 @@ if (!Array.remove){
 		square.answer = cand;
 		Board.updateSquare(board,sqrid);
 		// update the houses
-		row.candpositions[cand] = [sqrid];
-		col.candpositions[cand] = [sqrid];
-		box.candpositions[cand] = [sqrid];
+		row.candPositions[cand] = [sqrid];
+		col.candPositions[cand] = [sqrid];
+		box.candPositions[cand] = [sqrid];
 		CandList.add(row.answeredCands,cand);
 		CandList.add(col.answeredCands,cand);
 		CandList.add(box.answeredCands,cand);
