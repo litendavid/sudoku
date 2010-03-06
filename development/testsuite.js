@@ -52,10 +52,14 @@ test("is exposed",function(){
 });
 
 test("contains classes",function(){
-	equals(typeof SS.CandList,"function","CandList is declared");
-	equals(typeof SS.Square,"function","Square is declared");
-	equals(typeof SS.House,"function","House is declared");
-	equals(typeof SS.Board,"function","Board is declared");
+	equals(typeof SS.CandList,"function","CandList is exposed");
+	equals(typeof SS.Square,"function","Square is exposed");
+	equals(typeof SS.House,"function","House is exposed");
+	equals(typeof SS.Board,"function","Board is exposed");
+});
+
+test("contains resources",function(){
+	equals(typeof SS.constants,"object","Constant object is exposed");
 });
 
 /**************/ module("CandList"); /*******************************************************/
@@ -72,17 +76,23 @@ test("instantiation",function(){
 test("blocking candidate",function(){
 	var c = new SS.CandList(), turn = 7, candtoblock = 5;
 	equals(typeof c.block,"function","block function exists");
-	equals(c.block(candtoblock,turn),true,"blocking returns true if successful");
+	same(c.block(candtoblock,turn),SS.constants.EXECUTED,"blocking returns confirming value if successful");
 	equals(c.cands[candtoblock],turn,"blocked candidate is now set to given turn number");
-	equals(c.block(candtoblock,turn+1),false,"blocking a previously blocked cand returns false");
+	same(c.block(candtoblock,turn+1),SS.constants.NOACTION,"blocking a previously blocked cand returns false");
 	equals(c.cands[candtoblock],turn,"blocked candidate is still set to the turn where it was first blocked");	
 	ok(Array.compare([666,0,0,0,0,turn,0,0,0,0],c.cands),"candidate list is correct, all other cands still 0");
 	equals(c.nbrBlocked,1,"blocked counter is updated");
 	equals(typeof SS.CandList.block,"function","blocking function also has static counterpart");
 	candtoblock = 9;
-	equals(SS.CandList.block(c,candtoblock,turn),1,"static block also returns number of added cands");
+	equals(SS.CandList.block(c,candtoblock,turn),SS.constants.EXECUTED,"static block also returns number of added cands");
 	equals(c.cands[candtoblock],turn,"static block set also set cand to given turn number");
 	equals(c.nbrBlocked,2,"static block also updates nbrBlocked");
+	equals(c.block(candtoblock,turn,true),SS.constants.REVERTED,"blocking previously blocked cand with TOGGLE flag returns REVERTED value");
+	equals(c.cands[candtoblock],0,"cand block was toggled back");
+	equals(c.nbrBlocked,1,"toggling also updates nbrBlocked");
+	candtoblock = 1;
+	c.block(candtoblock,-1);
+	same(c.block(candtoblock,turn+1,true),SS.constants.NOACTION,"cannot toggle value set on Sudoku instantiation");
 });
 
 test("reverting CandList",function(){
@@ -121,28 +131,33 @@ test("instantiation",function(){
 test("blocking candidate in square",function(){
 	var s = new SS.Square(1,1);
 	equals(typeof s.block,"function","Square has a block function");
-	equals(s.block(5,6),true,"block function returns success");
-	equals(s.candList.cands[5],6,"block function simply calls CandList block");
+	same(s.block(5,6),SS.constants.EXECUTED,"block function returns success");
+	equals(s.candList.cands[5],6,"block function updated CandList");
+	same(s.block(5,6,true),SS.constants.REVERTED,"blocking same value toggles it back");
 	equals(typeof SS.Square.block,"function","block has static counterpart");
-	equals(SS.Square.block(s,7,8),true,"static block also returns success");
+	same(SS.Square.block(s,7,8),SS.constants.EXECUTED,"static block also returns success");
 	equals(s.candList.cands[7],8,"static block also calls CandList block");
+	s.answer(9,666);
+	same(SS.Square.block(s,1,667),SS.constants.NOACTION,"blocking candidate in already answered square fails");
 });
 
 test("answering square",function(){
 	var s = new SS.Square(5,6),candtoanswer = 5, turn = 7;
 	equals(typeof s.answer,"function","Square has an answer function");	
-	equals(s.answer(candtoanswer,turn),true,"answer returns true if successful");
+	same(s.answer(candtoanswer,turn),SS.constants.EXECUTED,"answer returns success");
 	equals(s.answeredCand,candtoanswer,"answeredCand now set to correct candidate");
 	equals(s.answeredTurn,turn,"answeredTurn now set to correct turn");
-	equals(s.answer(candtoanswer,turn),false,"subsequent answers same turn fail");
-	equals(s.answer(candtoanswer+1,turn+1),false,"subsequent answers later fail");
-	equals(s.answer(candtoanswer+1,turn+1),false,"subsequent answers later fail");
-	equals(s.block(candtoanswer-1,turn),false,"subsequent blocks after answer same turn fail");
-	equals(s.block(candtoanswer+2,turn+2),false,"subsequent blocks after answer later fail");
+	same(s.answer(candtoanswer,turn),SS.constants.NOACTION,"subsequent answers same turn fail");
+	same(s.answer(candtoanswer+1,turn+1),SS.constants.NOACTION,"subsequent answers later fail");
+	same(s.answer(candtoanswer+1,turn+1),SS.constants.NOACTION,"subsequent answers later fail");
+	same(s.block(candtoanswer-1,turn),SS.constants.NOACTION,"subsequent blocks after answer same turn fail");
+	same(s.block(candtoanswer+2,turn+2),SS.constants.NOACTION,"subsequent blocks after answer later fail");
 	s = new SS.Square(3,2);
-	s.block(5,1);
-	equals(s.answer(5,2),false,"answering a blocked cand fails");
+	s.block(candtoanswer,1);
+	same(s.answer(candtoanswer,2),SS.constants.NOACTION,"answering a blocked cand fails");
 	ok(!s.answeredCand,"square remains unanswered");
+	same(s.answer(candtoanswer+1,turn+1),SS.constants.EXECUTED,"cand still answer other cand");
+	same(s.answer(candtoanswer+1,turn+1,true),SS.constants.REVERTED,"new attempt to answer with toggle flag reverts to unanswered state");
 });
 
 test("reverting square",function(){

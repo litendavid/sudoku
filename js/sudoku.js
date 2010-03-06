@@ -130,6 +130,16 @@ if (!Array.remove){
 	 */
 	SS = {};
 	
+	/**
+	 * used as return value from certain functions
+	 */
+	var constants = {
+		NOACTION: "noaction",
+		REVERTED: "reverted",
+		EXECUTED: "executed"
+	};
+	SS.constants = constants;
+	
 /****************************** CandList class **************************************************/
 
 	/**
@@ -160,10 +170,11 @@ if (!Array.remove){
 	 * blocks a candidate, setting it to the given turn number
 	 * @param {int} cand The candidate to block
 	 * @param {int} turn The turn number to set it to
+	 * @param {boolean} toggle Whether or not to toggle already blocked value back to unblocked
 	 * @returns {boolean} Whether or not the cand was blocked
 	 */
-	CandList.prototype.block = function(cand,turn){
-		return CandList.block(this,cand,turn);
+	CandList.prototype.block = function(cand,turn,toggle){
+		return CandList.block(this,cand,turn,toggle);
 	};
 	
 	/**
@@ -171,18 +182,21 @@ if (!Array.remove){
 	 * @param {CandList} list The CandList to operate on
 	 * @param {int} cand The candidate to block
 	 * @param {int} turn The turn number to set it to
-	 * @returns {boolean} Whether or not the cand was blocked
+	 * @param {boolean} toggle Whether or not to toggle back to unblocked if already blocked
+	 * @returns {int} 1 if blocked, -1 if toggled to unblocked, 0 if was already blocked and no toggle
 	 */	
-	CandList.block = function(list,cand,turn){
+	CandList.block = function(list,cand,turn,toggle){
 		if (list.cands[cand] && list.cands[cand] <= turn){
-			return false;
+			if (toggle && list.cands[cand] != -1){
+				list.cands[cand] = 0;
+				list.nbrBlocked -= 1;
+				return constants.REVERTED;
+			}
+			return constants.NOACTION;
 		}
 		list.cands[cand] = turn;
-		list.nbrBlocked = 0;
-		for(var i=10;--i;){
-			list.nbrBlocked += (list.cands[i] ? 1 : 0);
-		}
-		return true;
+		list.nbrBlocked += 1;
+		return constants.EXECUTED;
 	};
 	
 	/**
@@ -296,10 +310,11 @@ if (!Array.remove){
 	 * blocks a candidate, setting it to the given turn number
 	 * @param {int} cand The candidate to block
 	 * @param {int} turn The turn number to set it to
+	 * @param {boolean} toggle Whether or not to toggle back already
 	 * @returns {boolean} Whether or not the cand was blocked
 	 */
-	Square.prototype.block = function(cand,turn){
-		return Square.block(this,cand,turn);
+	Square.prototype.block = function(cand,turn,toggle){
+		return Square.block(this,cand,turn,toggle);
 	};
 	
 	/**
@@ -307,13 +322,14 @@ if (!Array.remove){
 	 * @param {Square} square The Square to operate on
 	 * @param {int} cand The candidate to block
 	 * @param {int} turn The turn number to set it to
+	 * @param {boolean} toggle Whether or not to toggle back already
 	 * @returns {boolean} Whether or not the cand was blocked
 	 */	
-	Square.block = function(square,cand,turn){
+	Square.block = function(square,cand,turn,toggle){
 		if (square.answeredCand && square.answeredTurn <= turn){
-			return false;
+			return constants.NOACTION;
 		}
-		return CandList.block(square.candList,cand,turn);
+		return CandList.block(square.candList,cand,turn,toggle);
 	};
 	
 	/**
@@ -344,10 +360,11 @@ if (!Array.remove){
 	 * Sets square answer as given candidate at given turn
 	 * @param {int} cand The cand to set it to
 	 * @param {int} turn The turn number to revert it to
-	 * @returns {boolean} Whether or not the answering was successfull
+	 * @param {boolean} toggle Whether or not to toggle back answer
+	 * @returns {int} Action code according to constant
 	 */	
-	Square.prototype.answer = function(cand,turn){
-		return Square.answer(this,cand,turn);
+	Square.prototype.answer = function(cand,turn,toggle){
+		return Square.answer(this,cand,turn,toggle);
 	};
 	
 	/**
@@ -355,15 +372,23 @@ if (!Array.remove){
 	 * @param {Square} square The square to operate on
 	 * @param {int} cand The cand to set it to
 	 * @param {int} turn The turn number to revert it to
-	 * @returns {boolean} Whether or not the answering was successfull
+	 * @returns {int} Action code according to constant
 	 */	
-	Square.answer = function(square,cand,turn){
-		if (square.answeredTurn <= turn || (square.candList.cands[cand] && square.candList.cands[cand] <= turn)){
-			return false;
+	Square.answer = function(square,cand,turn,toggle){
+		if (square.candList.cands[cand] && square.candList.cands[cand] <= turn){ // that cand is blocked
+			return constants.NOACTION;
+		} 
+		if (square.answeredCand && square.answeredTurn <= turn){ // square already answered
+			if (toggle){
+				square.answeredTurn = undefined;
+				square.answeredCand = undefined;
+				return constants.REVERTED;
+			}
+			return constants.NOACTION;
 		}
 		square.answeredTurn = turn;
 		square.answeredCand = cand;
-		return true;
+		return constants.EXECUTED;
 	};
 
 
@@ -400,7 +425,7 @@ if (!Array.remove){
 		/**
 		 * possible positions for the different candidates
 		 * @name House#candPositions
-		 * @type array
+		 * @type object
 		 */
 		this.candPositions = {
 			1: {},
@@ -540,24 +565,58 @@ if (!Array.remove){
 	 * @class a board object
 	 * @param {string} selector The ID of the wrapper for the DOM representation
 	 */
-	var Board = function(selector){
-		if (selector) {
-			this.selector = selector;
-		}
+	var Board = function(selector,free){
+		/**
+		 * DOM id of board wrapper
+		 * @name Board#selector
+		 * @type string
+		 */
+		this.selector = selector;
+		/**
+		 * object with sqrids as key, squares as value
+		 * @name Board#squares
+		 * @type object
+		 */
 		this.squares = {};
+		/**
+		 * object with movenumber as key, effectobject as value. move to own class? Not yet used.
+		 * @name Board#moves
+		 * @type object
+		 */
 		this.moves = {};
+		/**
+		 * object containing currently selected squares/cands/houses. Not yet used.
+		 * @name Board#moves
+		 * @type object
+		 */
 		this.selection = {};
+		/**
+		 * object with houseids as key, houses as value
+		 * @name Board#houses
+		 * @type object
+		 */
 		this.houses = {};
+		/**
+		 * the current turn number, set to 1 after sudoku is set
+		 * @name Board#currentTurn
+		 * @type int
+		 */
 		this.currentTurn = -1;
+		/**
+		 * flag if board is in free mode
+		 * @name Board#free
+		 * @type boolean
+		 */
+		this.free = !!free;
 
 		for (var h = 1; h < 10; h++) {
-			this.houses["r" + h] = new SS.House("r"+h);
-			this.houses["c" + h] = new SS.House("c"+h);
-			this.houses["b" + h] = new SS.House("b"+h);
+			this.houses["r" + h] = new House("r"+h);
+			this.houses["c" + h] = new House("c"+h);
+			this.houses["b" + h] = new House("b"+h);
 		}
 		for (var r = 1; r < 10; r++) {
 			for (var c = 1; c < 10; c++) {
-				var s = new SS.Square(r,c); 
+				var s = new Square(r,c); 
 				this.squares[s.id] = s;
 				this.houses[s.row].add(s.id);
 				this.houses[s.col].add(s.id);
