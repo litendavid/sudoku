@@ -378,9 +378,9 @@ if (!Array.remove){
 		if (square.candList.cands[cand] && square.candList.cands[cand] <= turn){ // that cand is blocked
 			return constants.NOACTION;
 		} 
-		if (square.answeredCand && square.answeredTurn <= turn){ // square already answered
-			if (toggle){
-				square.answeredTurn = undefined;
+		if (square.answeredCand){ // square already answered
+			if (toggle && square.answeredTurn != -1){
+				square.answeredTurn = 0;
 				square.answeredCand = undefined;
 				return constants.REVERTED;
 			}
@@ -462,10 +462,11 @@ if (!Array.remove){
 	 * @param {int} cand The candidate to block
 	 * @param {int} turn The turn number to set it to
 	 * @param {string} sqrid The id of the square to block cand in
+	 * @param {boolean} toggle Whether or not to toggle back eventual previous block
 	 * @returns {boolean} Whether or not the cand was not already blocked
 	 */
-	House.prototype.block = function(cand,turn,sqrid){
-		return House.block(this,cand,turn,sqrid);
+	House.prototype.block = function(cand,turn,sqrid,toggle){
+		return House.block(this,cand,turn,sqrid,toggle);
 	};
 	
 	/**
@@ -474,14 +475,19 @@ if (!Array.remove){
 	 * @param {int} cand The candidate to block
 	 * @param {int} turn The turn number to set it to
 	 * @param {string} sqrid The id of the square to block cand in
+	 * @param {boolean} toggle Whether or not to toggle back eventual previous block
 	 * @returns {boolean} Whether or not the cand was not already blocked
 	 */
-	House.block = function(house,cand,turn,sqrid){
+	House.block = function(house,cand,turn,sqrid,toggle){
 		if (house.candPositions[cand][sqrid]){
-			return false;
+			if (toggle && house.candPositions[cand][sqrid] != -1){
+				house.candPositions[cand][sqrid] = 0;
+				return constants.REVERTED;
+			}
+			return constants.NOACTION;
 		}
 		house.candPositions[cand][sqrid] = turn;
-		return true;
+		return constants.EXECUTED;
 	};
 	
 	/**
@@ -489,10 +495,11 @@ if (!Array.remove){
 	 * @param {int} cand The candidate to answer
 	 * @param {int} turn The turn number in which to answer
 	 * @param {string} sqrid The id of the square to answer cand in
+	 * @param {boolean} toggle Whether or not to toggle back eventual previous answer
 	 * @returns {boolean} Whether or not the cand was not already answered
 	 */
-	House.prototype.answer = function(cand,turn,sqrid){
-		return House.answer(this,cand,turn,sqrid);
+	House.prototype.answer = function(cand,turn,sqrid,toggle){
+		return House.answer(this,cand,turn,sqrid,toggle);
 	};
 	
 	/**
@@ -501,23 +508,29 @@ if (!Array.remove){
 	 * @param {int} cand The candidate to answer
 	 * @param {int} turn The turn number in which to answer
 	 * @param {string} sqrid The id of the square to answer cand in
+	 * @param {boolean} toggle Whether or not to toggle back eventual previous block
 	 * @returns {boolean} Whether or not the cand was not already answered
 	 */
-	House.answer = function(house,cand,turn,sqrid){
-		if (house.answeredCands[cand] && house.answeredCands[cand] <= turn){ // already answered for that cand
-			return false;
+	House.answer = function(house,cand,turn,sqrid,toggle){
+		if (house.answeredCands[cand]){ // already answered for that cand
+			if (toggle && house.answeredCands[cand] != -1){
+				house.answeredCands[cand] = 0;
+				house.answerPositions[cand] = undefined;
+				return constants.REVERTED;
+			}
+			return constants.NOACTION;
 		}
-		if (house.candPositions[cand][sqrid] && house.candPositions[cand][sqrid] <= turn){ // cand is blocked in that square
-			return false;
+		if (house.candPositions[cand][sqrid]){ // cand is blocked in that square
+			return constants.NOACTION;
 		}
 		for(var i in house.answerPositions){   // square already answered with some cand
 			if (house.answerPositions[i]===sqrid){
-				return false;
+				return constants.NOACTION;
 			}
 		}
 		house.answeredCands[cand] = turn;
 		house.answerPositions[cand] = sqrid;
-		return true;
+		return constants.EXECUTED;
 	};
 
 	/**

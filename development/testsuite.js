@@ -156,8 +156,12 @@ test("answering square",function(){
 	s.block(candtoanswer,1);
 	same(s.answer(candtoanswer,2),SS.constants.NOACTION,"answering a blocked cand fails");
 	ok(!s.answeredCand,"square remains unanswered");
-	same(s.answer(candtoanswer+1,turn+1),SS.constants.EXECUTED,"cand still answer other cand");
+	same(s.answer(candtoanswer+1,turn+1,true),SS.constants.EXECUTED,"answering with toggle flag works like normal if not previously answered");
 	same(s.answer(candtoanswer+1,turn+1,true),SS.constants.REVERTED,"new attempt to answer with toggle flag reverts to unanswered state");
+	same(s.answeredCand,undefined,"square no longer has answeredCand");
+	same(s.answeredTurn,0,"square no longer has answeredTurn");
+	same(SS.Square.answer(s,candtoanswer,-1,true),SS.constants.EXECUTED,"answering with static function and toggle also works like normal");
+	same(SS.Square.answer(s,candtoanswer,-1,true),SS.constants.NOACTION,"cannot toggle back answer from first turn");
 });
 
 test("reverting square",function(){
@@ -214,28 +218,38 @@ test("blocking candidate in house",function(){
 	var h = new SS.House(),sqrid="r1c1",cand = 5, turn = 15;
 	h.add(sqrid);
 	equals(typeof h.block,"function","House has a block function");
-	equals(h.block(cand,turn,sqrid),true,"block function returns true if wasn't previously blocked in the house");
-	equals(h.block(cand,turn,sqrid),false,"block function returns false if was previously blocked same turn");
-	equals(h.block(cand,turn+1,sqrid),false,"block function returns false if was previously blocked earlier turn");
+	same(h.block(cand,turn,sqrid),SS.constants.EXECUTED,"block function returns success if wasn't previously blocked in the house");
+	same(h.block(cand,turn,sqrid),SS.constants.NOACTION,"block function returns noaction if was previously blocked same turn");
+	same(h.block(cand,turn+1,sqrid),SS.constants.NOACTION,"block function returns noaction if was previously blocked earlier turn");
 	equals(h.candPositions[cand][sqrid],turn,"Square is now marked as blocked for that candidate at that turn");	
 	equals(typeof SS.House.block,"function","block has static counterpart");
 	sqrid = "r2c2";
 	h.add("r2c2");
-	equals(SS.House.block(h,cand,turn,sqrid),true,"static block also returns success");
-	equals(h.candPositions[cand][sqrid],turn,"Static block also marked square as blocked for that candidate at that turn");	
+	same(SS.House.block(h,cand,turn,sqrid),SS.constants.EXECUTED,"static block also returns success");
+	equals(h.candPositions[cand][sqrid],turn,"Static block also marked square as blocked for that candidate at that turn");
+	same(SS.House.block(h,cand,turn,sqrid,true),SS.constants.REVERTED,"block reverts previous block if toggle flag is true");
+	same(SS.House.block(h,cand+1,-1,sqrid,true),SS.constants.EXECUTED,"will block as normal with toggle flag set to true if not previously blocked");
+	same(SS.House.block(h,cand+1,-1,sqrid,true),SS.constants.NOACTION,"cannot revert block done when sudoku was set (turn -1)");
+	equals(h.candPositions[cand+1][sqrid],-1,"First turn block is unaffected");
 });
 
 test("answering cand in house",function(){
 	var h = new SS.House(),sqrid="r1c1",othersqrid="r2c2",cand = 5, othercand = 7, turn = 15;
 	equals(typeof h.answer,"function","House has an answer function");	
-	equals(h.answer(cand,turn,sqrid),true,"answer returns true if successful");
+	same(h.answer(cand,turn,sqrid),SS.constants.EXECUTED,"answer returns true if successful");
 	equals(h.answerPositions[cand],sqrid,"square now registered as answerpos for that cand");
 	equals(h.answeredCands[cand],turn,"answeredCands now set to correct turn for that candidate");
-	equals(h.answer(cand,turn,othersqrid),false,"subsequent answers of same cand in other square return false");
-	equals(h.answer(othercand,turn,sqrid),false,"subsequent answers of other cand in same square return false");
+	equals(h.answer(cand,turn,othersqrid),SS.constants.NOACTION,"subsequent answers of same cand in other square return false");
+	equals(h.answer(othercand,turn,sqrid),SS.constants.NOACTION,"subsequent answers of other cand in same square return false");
 	h.block(othercand,turn,othersqrid);
-	equals(h.answer(othercand,turn+1,othersqrid),false,"answering cand in square thats already blocked returns false");
+	equals(h.answer(othercand,turn+1,othersqrid),SS.constants.NOACTION,"answering cand in square thats already blocked returns false");
 	equals(typeof SS.House.answer,"function","House has static answer function too");
+	same(h.answer(cand,turn,sqrid,true),SS.constants.REVERTED,"if toggle is true, previous answer is reverted");
+	same(h.answeredCands[cand],0,"cand no longer has answerturn");
+	ok(!h.answerPositions[cand],"cand no longer has answerposition");
+	same(SS.House.answer(h,cand,-1,sqrid,true),SS.constants.EXECUTED,"answering cand with toggle=true works as normal for nonextisting answer");
+	equals(h.answeredCands[cand],-1,"answeredCands now set to correct turn for that candidate");	
+	same(SS.House.answer(h,cand,-1,sqrid,true),SS.constants.NOACTION,"answers made on the first turn cannot be reverted");
 });
 
 test("reverting house",function(){
