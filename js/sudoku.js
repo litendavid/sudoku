@@ -186,7 +186,7 @@ if (!Array.remove){
 	 * @returns {int} 1 if blocked, -1 if toggled to unblocked, 0 if was already blocked and no toggle
 	 */	
 	CandList.block = function(list,cand,turn,toggle){
-		if (list.cands[cand] && list.cands[cand] <= turn){
+		if (list.cands[cand]){
 			if (toggle && list.cands[cand] != -1){
 				list.cands[cand] = 0;
 				list.nbrBlocked -= 1;
@@ -275,6 +275,18 @@ if (!Array.remove){
 		 * @type CandList
 		 */
 		this.candList = new CandList();
+		/**
+		 * turn in which square was given an answer
+		 * @name Square#answeredTurn
+		 * @type int
+		 */
+		this.answeredTurn = 0;
+		/**
+		 * candidate square is answered as
+		 * @name Square#answeredCand
+		 * @type int
+		 */
+		this.answeredCand = 0;
 	};
 	
 	/**
@@ -326,7 +338,7 @@ if (!Array.remove){
 	 * @returns {boolean} Whether or not the cand was blocked
 	 */	
 	Square.block = function(square,cand,turn,toggle){
-		if (square.answeredCand && square.answeredTurn <= turn){
+		if (square.answeredCand){
 			return constants.NOACTION;
 		}
 		return CandList.block(square.candList,cand,turn,toggle);
@@ -375,13 +387,13 @@ if (!Array.remove){
 	 * @returns {int} Action code according to constant
 	 */	
 	Square.answer = function(square,cand,turn,toggle){
-		if (square.candList.cands[cand] && square.candList.cands[cand] <= turn){ // that cand is blocked
+		if (square.candList.cands[cand]){ // that cand is blocked
 			return constants.NOACTION;
 		} 
 		if (square.answeredCand){ // square already answered
 			if (toggle && square.answeredTurn != -1){
 				square.answeredTurn = 0;
-				square.answeredCand = undefined;
+				square.answeredCand = 0;
 				return constants.REVERTED;
 			}
 			return constants.NOACTION;
@@ -515,7 +527,7 @@ if (!Array.remove){
 		if (house.answeredCands[cand]){ // already answered for that cand
 			if (toggle && house.answeredCands[cand] != -1){
 				house.answeredCands[cand] = 0;
-				house.answerPositions[cand] = undefined;
+				house.answerPositions[cand] = 0;
 				return constants.REVERTED;
 			}
 			return constants.NOACTION;
@@ -664,15 +676,17 @@ if (!Array.remove){
 	 * @returns {bool} whether or not cand was removed (might already have been removed)
 	 */
 	Board.blockCandInSquare = function(board,cand,sqrid){
-		var square = board.squares[sqrid], turn = board.currentTurn;
-		if (!Square.block(square,cand,turn)){
-			return false;
+		var square = board.squares[sqrid],
+		    turn = board.currentTurn,
+			toggle = board.free,
+			squareresult = Square.block(square,cand,turn,toggle);
+		if (squareresult != constants.NOACTION) {
+			House.block(board.houses[square.row], cand, turn, sqrid, toggle);
+			House.block(board.houses[square.col], cand, turn, sqrid, toggle);
+			House.block(board.houses[square.box], cand, turn, sqrid, toggle);
+			Board.updateSquare(board, sqrid);
 		}
-		House.block(board.houses[square.row],cand,turn,sqrid);
-		House.block(board.houses[square.col],cand,turn,sqrid);
-		House.block(board.houses[square.box],cand,turn,sqrid);
-		Board.updateSquare(board,sqrid);
-		return true;
+		return squareresult;
 	};
 
 	/**
@@ -693,23 +707,26 @@ if (!Array.remove){
 	 * @returns {bool} whether or not cand was answered (might not be available in square)
 	 */
 	Board.answerSquare = function(board,cand,sqrid){
-		var square = board.squares[sqrid], row = board.houses[square.row], col = board.houses[square.col], box = board.houses[square.box],
-		    turn = board.currentTurn;
-		if (square.answeredCand || (square.candList.cands[cand] && square.candList.cands[cand] <= turn)){
-			return false;
+		var square = board.squares[sqrid],
+    		row = board.houses[square.row],
+		    col = board.houses[square.col], 
+			box = board.houses[square.box],
+		    turn = board.currentTurn,
+			toggle = board.free,
+			squareresult = Square.answer(square,cand,turn,toggle);
+		if (squareresult != constants.NOACTION) {
+			// update square in UI
+			Board.updateSquare(board, sqrid);
+			// update the houses
+			House.answer(row, cand, turn, sqrid, toggle);
+			House.answer(col, cand, turn, sqrid, toggle);
+			House.answer(box, cand, turn, sqrid, toggle);
+			// update the neighbours
+			for (var nid in square.neighbours) {
+				Board.blockCandInSquare(board, cand, square.neighbours[nid], toggle);
+			}
 		}
-		// update the square
-		Square.answer(square,cand,turn);
-		Board.updateSquare(board,sqrid);
-		// update the houses
-		House.answer(board.houses[square.row],cand,turn,sqrid);
-		House.answer(board.houses[square.col],cand,turn,sqrid);
-		House.answer(board.houses[square.box],cand,turn,sqrid);
-		// update the neighbours
-		for(var nid in square.neighbours){
-			Board.blockCandInSquare(board,cand,square.neighbours[nid]);
-		}
-		return true;
+		return squareresult;
 	};
 	
 	

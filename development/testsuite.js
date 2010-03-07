@@ -126,6 +126,8 @@ test("instantiation",function(){
 	equals((new SS.Square(1,3).box),"b1","r1c3 has box b1");
 	equals((new SS.Square(6,4).box),"b5","r6c4 has box b5");
 	equals((new SS.Square(7,7).box),"b9","r7c7 has box b9");
+	same(s.answeredCand,0,"new square has answeredCand 0");
+	same(s.answeredTurn,0,"new square has answeredTurn 0");
 });
 
 test("blocking candidate in square",function(){
@@ -158,8 +160,9 @@ test("answering square",function(){
 	ok(!s.answeredCand,"square remains unanswered");
 	same(s.answer(candtoanswer+1,turn+1,true),SS.constants.EXECUTED,"answering with toggle flag works like normal if not previously answered");
 	same(s.answer(candtoanswer+1,turn+1,true),SS.constants.REVERTED,"new attempt to answer with toggle flag reverts to unanswered state");
-	same(s.answeredCand,undefined,"square no longer has answeredCand");
+	same(s.answeredCand,0,"square no longer has answeredCand");
 	same(s.answeredTurn,0,"square no longer has answeredTurn");
+	s = new SS.Square(3,2);
 	same(SS.Square.answer(s,candtoanswer,-1,true),SS.constants.EXECUTED,"answering with static function and toggle also works like normal");
 	same(SS.Square.answer(s,candtoanswer,-1,true),SS.constants.NOACTION,"cannot toggle back answer from first turn");
 });
@@ -246,7 +249,7 @@ test("answering cand in house",function(){
 	equals(typeof SS.House.answer,"function","House has static answer function too");
 	same(h.answer(cand,turn,sqrid,true),SS.constants.REVERTED,"if toggle is true, previous answer is reverted");
 	same(h.answeredCands[cand],0,"cand no longer has answerturn");
-	ok(!h.answerPositions[cand],"cand no longer has answerposition");
+	equals(h.answerPositions[cand],0,"cand no longer has answerposition");
 	same(SS.House.answer(h,cand,-1,sqrid,true),SS.constants.EXECUTED,"answering cand with toggle=true works as normal for nonextisting answer");
 	equals(h.answeredCands[cand],-1,"answeredCands now set to correct turn for that candidate");	
 	same(SS.House.answer(h,cand,-1,sqrid,true),SS.constants.NOACTION,"answers made on the first turn cannot be reverted");
@@ -261,8 +264,8 @@ test("reverting house",function(){
 	h.answer(cand,turn+3,othersqrid);
 	equals(h.revert(turn+5),false,"Reverting returns false if no change was made");
 	equals(h.revert(turn),true,"Reverting returns true if change was made");
-	ok(!h.answerPositions[cand],"cand no longer has answerposition");
-	ok(!h.answerPositions[othercand],"othercand no longer has answerposition");
+	same(h.answerPositions[cand],0,"cand no longer has answerposition");
+	same(h.answerPositions[othercand],0,"othercand no longer has answerposition");
 	equals(h.candPositions[cand][sqrid],turn-1,"cand is still blocked in square");
 	equals(h.candPositions[othercand][othersqrid],0,"othercand is no longer blocked in othersquare");
 	equals(typeof SS.House.revert,"function","House has static revert function too");
@@ -272,9 +275,10 @@ test("reverting house",function(){
 /**************/ module("Board"); /*********************************************/
 
 test("board generation",function(){
-	var board = new SS.Board("domid");
+	var board = new SS.Board("domid",false);
 	ok(board instanceof SS.Board,"Board is constructor");
 	equals(board.selector,"domid","selection property was correctly set");
+	same(board.free,false,"freemode property was correctly set to false");
 	equals(typeof board.squares, "object", "Contains square object");
 	equals(typeof board.houses, "object", "Contains houses object");
 	equals(typeof board.moves, "object", "Contains moves object");
@@ -295,6 +299,8 @@ test("board generation",function(){
 		}
 	}
 	ok(!error,"all candPositions has 0 for all squares");
+	board = new SS.Board("someid",true);
+	same(board.free,true,"freemode property was correctly set to true");	
 });
 
 test("candidate blocking",function(){
@@ -304,21 +310,47 @@ test("candidate blocking",function(){
 	board.currentTurn = turn;
 	equals(typeof board.blockCandInSquare,"function","Board has blockCandInSquare function");
 	ok(!row.candPositions[cand][sqrid] && !col.candPositions[cand][sqrid] && !box.candPositions[cand][sqrid],"square is possible position for cand in all its houses");
-	ok(board.blockCandInSquare(cand,sqrid),"blocking returns true");
+	same(board.blockCandInSquare(cand,sqrid),SS.constants.EXECUTED,"blocking returns success");
+	same(board.blockCandInSquare(cand,sqrid),SS.constants.NOACTION,"repeated blocking fails");
 	equals(row.candPositions[cand][sqrid],turn,"square is blocked at this turn in its row");
 	equals(col.candPositions[cand][sqrid],turn,"square is blocked at this turn in its col");
 	equals(box.candPositions[cand][sqrid],turn,"square is blocked at this turn in its box");
-	ok(!board.blockCandInSquare(cand,sqrid),"subsequent removal returns false");
-	equals(typeof SS.Board.blockCandInSquare,"function","There is static version of blockCandInSquare function");	
+	same(board.blockCandInSquare(cand,sqrid),SS.constants.NOACTION,"subsequent removal returns false");
+	equals(typeof SS.Board.blockCandInSquare,"function","There is static version of blockCandInSquare function");
+	board.free = true;
+	same(SS.Board.blockCandInSquare(board,cand,sqrid),SS.constants.REVERTED,"Blocking is reverted if board is in freemode");
+	same(row.candPositions[cand][sqrid],0,"square is no longer blocked at this turn in its row");
+	same(col.candPositions[cand][sqrid],0,"square is blocked at this turn in its col");
+	same(box.candPositions[cand][sqrid],0,"square is blocked at this turn in its box");
 });
 
 test("answering a square",function(){
 	var board = new SS.Board("#board"), sqrid = "r5c5", cand = 3, square = board.squares[sqrid], 
-		row = board.houses[square.row], col = board.houses[square.col], box = board.houses[square.box];
+		row = board.houses[square.row], col = board.houses[square.col], box = board.houses[square.box], turn = 666;
+	board.currentTurn = turn;
 	equals(typeof board.answerSquare,"function","Board has answerSquare function");
-	ok(board.answerSquare(cand,sqrid),"answering returns true");
+	same(board.answerSquare(cand,sqrid),SS.constants.EXECUTED,"answering returns success");
 	equal(square.answeredCand,cand,"Square is now answered as cand");
-	ok(Array.compare(square.candList.cands,[666,0,0,0,0,0,0,0,0,0],"square now has empty candlist"));
+	equal(square.answeredTurn,turn,"Square is answered in this turn");
+	equal(row.answeredCands[cand],turn,"Row has turn as answeredTurn for cand");
+	equal(row.answerPositions[cand],sqrid,"Row has sqrid as answerPosition for cand");
+	equal(col.answeredCands[cand],turn,"Col has turn as answeredTurn for cand");
+	equal(col.answerPositions[cand],sqrid,"Col has sqrid as answerPosition for cand");
+	equal(box.answeredCands[cand],turn,"Box has turn as answeredTurn for cand");
+	equal(box.answerPositions[cand],sqrid,"Box has sqrid as answerPosition for cand");
+	equals(typeof SS.Board.answerSquare,"function","Board has static answerSquare function");
+	same(SS.Board.answerSquare(board,cand,sqrid),SS.constants.NOACTION,"subsequent answer returns noaction");
+	board.free = true;
+	same(SS.Board.answerSquare(board,cand,sqrid),SS.constants.REVERTED,"subsequent answer in freemode means reversal");
+	equal(square.answeredCand,0,"Square is no longer answered as cand");
+	equal(square.answeredTurn,0,"Square no longer has answeredTurn");
+	equal(row.answeredCands[cand],0,"Row no longer has turn as answeredTurn for cand");
+	equal(row.answerPositions[cand],0,"Row no longer has sqrid as answerPosition for cand");
+	equal(col.answeredCands[cand],0,"Col no longer has turn as answeredTurn for cand");
+	equal(col.answerPositions[cand],0,"Col no longer has sqrid as answerPosition for cand");
+	equal(box.answeredCands[cand],0,"Box no longer has turn as answeredTurn for cand");
+	equal(box.answerPositions[cand],0,"Box no longer has sqrid as answerPosition for cand");
+	equals(typeof SS.Board.answerSquare,"function","Board has static answerSquare function");
 });
 
 test("setting a sudoku",function(){
