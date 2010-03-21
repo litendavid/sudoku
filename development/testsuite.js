@@ -62,91 +62,351 @@ test("contains resources",function(){
 	equals(typeof SS.constants,"object","Constant object is exposed");
 });
 
-/**************/ module("CandList"); /*******************************************************/
+/**************/ module("BlockList"); /*******************************************************/
+
+var BlockList = SS.BlockList;
 
 test("instantiation",function(){
-	var c = new SS.CandList();
-	ok(Array.compare(c.cands,[666,0,0,0,0,0,0,0,0,0]),"defaults to having no blocked candidates");
-	equals(c.nbrBlocked,0,"has correct blocked total");
-	c = new SS.CandList([666,0,0,0,0,0,0,0,1,1]);
-	ok(Array.compare(c.cands,[666,0,0,0,0,0,0,0,1,1]),"can be instantiated with given candidates");
-	equals(c.nbrBlocked,2,"has correct blocked total");
+	var b = new BlockList();
+	ok(b instanceof BlockList,"BlockList is constructor");
+	for (var i = 1; i <= 9; i++) {
+		same(BlockList.get(b, i), 0, "Has item "+i+" set as 0");
+	}
+	equals(b.list.length,9,"has all listed as remaining");
+	var squares = ["r1c1","r1c2","r1c3"];
+	b = new BlockList(squares);
+	for (i = 0; i < squares.length; i++) {
+		same(BlockList.get(b, squares[i]), 0, "Has item "+squares[i]+" set as 0");
+	}
 });
 
-test("blocking candidate",function(){
-	var c = new SS.CandList(), turn = 7, candtoblock = 5;
-	equals(typeof c.block,"function","block function exists");
-	same(c.block(candtoblock,turn),SS.constants.EXECUTED,"blocking returns confirming value if successful");
-	equals(c.cands[candtoblock],turn,"blocked candidate is now set to given turn number");
-	same(c.block(candtoblock,turn+1),SS.constants.NOACTION,"blocking a previously blocked cand returns false");
-	equals(c.cands[candtoblock],turn,"blocked candidate is still set to the turn where it was first blocked");	
-	ok(Array.compare([666,0,0,0,0,turn,0,0,0,0],c.cands),"candidate list is correct, all other cands still 0");
-	equals(c.nbrBlocked,1,"blocked counter is updated");
-	equals(typeof SS.CandList.block,"function","blocking function also has static counterpart");
-	candtoblock = 9;
-	equals(SS.CandList.block(c,candtoblock,turn),SS.constants.EXECUTED,"static block also returns number of added cands");
-	equals(c.cands[candtoblock],turn,"static block set also set cand to given turn number");
-	equals(c.nbrBlocked,2,"static block also updates nbrBlocked");
-	equals(c.block(candtoblock,turn,true),SS.constants.REVERTED,"blocking previously blocked cand with TOGGLE flag returns REVERTED value");
-	equals(c.cands[candtoblock],0,"cand block was toggled back");
-	equals(c.nbrBlocked,1,"toggling also updates nbrBlocked");
-	candtoblock = 1;
-	c.block(candtoblock,-1);
-	same(c.block(candtoblock,turn+1,true),SS.constants.NOACTION,"cannot toggle value set on Sudoku instantiation");
+test("adding block",function(){
+	var b = new BlockList(), turn = 7, candtoblock = 5;
+	equals(typeof BlockList.add,"function","add block function exists");
+	same(BlockList.is(b,candtoblock),false,"candtoblock is false at first");
+	same(BlockList.add(b,{
+		k: candtoblock,
+		t: turn
+	}),true,"blocking returns true value if successful");
+	same(BlockList.is(b,candtoblock),true,"candtoblock is true after block");
+	same(BlockList.get(b,candtoblock),turn,"blocked candidate is now set to given turn number");
+	same(BlockList.add(b,{
+		k: candtoblock,
+		t: turn + 1
+	}),false,"blocking a previously blocked cand returns false");
+	same(BlockList.get(b,candtoblock),turn,"blocked candidate is still set to the turn where it was first blocked");
+	same(b.list.length,8,"list now has only 8 members listed as unblocked");
+	same(Array.locate(candtoblock,b.list),-1,"list now doesn't contain 8");
 });
 
-test("reverting CandList",function(){
-	var c = new SS.CandList();
-	c.block(1,10);
-	c.block(2,11);
-	c.block(3,12);
-	c.block(4,13);
-	equals(typeof c.revert,"function","revert function exists");
-	equals(c.revert(20),false,"revert returns false if no change was made");
-	equals(c.revert(11),true,"revert returns true if change was made");
-	ok(Array.compare([666,10,11,0,0,0,0,0,0,0],c.cands),"candidate list is now reverted to state at given turn");
-	equals(c.nbrBlocked,2,"blockedcount is updated");
-	equals(typeof SS.CandList.revert,"function","revert function also has static counterpart");
-	equals(SS.CandList.revert(c,10),true,"static revert also returns whether change was made");
-	ok(Array.compare([666,10,0,0,0,0,0,0,0,0],c.cands),"static revert also changed candList");
-	equals(c.nbrBlocked,1,"static revert also updates nbrCands");
+test("reverting BlockList",function(){
+	var b = new BlockList();
+	BlockList.add(b,{
+		k: 1,
+		t: 10
+	});
+	BlockList.add(b,{
+		k: 2,
+		t: 11
+	});
+	BlockList.add(b,{
+		k: 3,
+		t: 12
+	});
+	BlockList.add(b,{
+		k: 4,
+		t: 13
+	});
+	equals(typeof BlockList.revert,"function","revert function exists");
+	BlockList.revert(b,11);
+	same(b.list.length,7,"reverting restored list to given turn");
+	same(BlockList.get(b,4),0,"4 is no longer set");
+	same(BlockList.get(b,3),0,"3 is no longer set");
+	same(BlockList.get(b,2),11,"2 is still set");
+	same(BlockList.get(b,1),10,"1 is still set");
+	same(Array.locate(1,b.list),-1,"unblocked list doesn't contain 1");
+	same(Array.locate(2,b.list),-1,"unblocked list doesn't contain 2");
+	ok(Array.locate(3,b.list)>-1,"unblocked list now contains 3");
+	ok(Array.locate(4,b.list)>-1,"unblocked list now contains 4");
 });
+
+test("removing block in BlockList",function(){
+	var b = new BlockList(), turn = 7, candtoblock = 5;
+	equals(typeof BlockList.remove,"function","remove block function exists");
+	ok(BlockList.add(b,candtoblock,turn),"Block is added before removal");
+	BlockList.remove(b,candtoblock);
+	same(BlockList.get(b,candtoblock),0,"Candidate is no longer blocked");
+	ok(Array.locate(candtoblock,b.list)>-1,"unblocked list now contains candidate");
+});
+
+test("testing item in BlockList",function(){
+	var b = new BlockList(), turn = 7, candtoblock = 5;
+	equals(typeof BlockList.is,"function","testing function exists (is)");
+	same(BlockList.is(b,candtoblock),false,"test returns false before block");
+	BlockList.add(b,{
+		k: candtoblock,
+		t: turn
+	});
+	same(BlockList.is(b,candtoblock),true,"test returns true after block");	
+	BlockList.remove(b,candtoblock);
+	same(BlockList.is(b,candtoblock),false,"test returns false after removal of block");
+});
+
+
+
+/**************/ module("AnswerList"); /*******************************************************/
+
+var AnswerList = SS.AnswerList;
+
+test("instantiation",function(){
+	var a = new AnswerList();
+	ok(a instanceof AnswerList,"AnswerList is constructor");
+	for (var i = 1; i <= 9; i++) {
+		var item = AnswerList.get(a, i);
+		ok(item instanceof Object, "Item "+i+" is an object");
+		same(item.t,0,"item "+i+" has turn set to 0");
+		same(item.p,0,"item "+i+" has position set to 0");
+	}
+	equals(a.list.length,9,"has all listed as unanswered");
+});
+
+test("adding answer",function(){
+	var a = new AnswerList(), turn = 7, candtoanswer = 5, position = "r1c1";
+	equals(typeof AnswerList.add,"function","add answer function exists");
+	same(AnswerList.add(a,{
+		k: candtoanswer,
+		t: turn,
+		p: position
+	}),true,"answering returns true if successful");
+	var item = AnswerList.get(a,candtoanswer);
+	ok(item instanceof Object, "Item "+candtoanswer+" is an object");
+	same(item.t,turn,"item has turn set to turn");
+	same(item.p,position,"item has position set to position");
+	same(AnswerList.add(a,{
+		k: candtoanswer,
+		t: turn + 1,
+		p: position
+	}),false,"answering a previously answered cand returns false");
+	same(AnswerList.get(a,candtoanswer).t,turn,"answered candidate is still set to the turn where it was first answered");
+	same(a.list.length,8,"list now has only 8 members listed as unanswered");
+	same(Array.locate(candtoanswer,a.list),-1,"list now doesn't contain candtoanswer");
+});
+
+test("reverting AnswerList",function(){
+	var a = new AnswerList();
+	AnswerList.add(a,{
+		k: 1,
+		t: 10,
+		p: "p1"
+	});
+	AnswerList.add(a,{
+		k: 2,
+		t: 11,
+		p: "p2"
+	});
+	AnswerList.add(a,{
+		k: 3,
+		t: 12,
+		p: "p3"
+	});
+	AnswerList.add(a,{
+		k: 4,
+		t: 13,
+		p: "p4"
+	});
+	equals(typeof AnswerList.revert,"function","revert function exists");
+	AnswerList.revert(a,11);
+	same(a.list.length,7,"reverting restored list to given turn");
+	same(AnswerList.get(a,4).t,0,"4 is no longer set");
+	same(AnswerList.get(a,3).t,0,"3 is no longer set");
+	same(AnswerList.get(a,2).t,11,"2 is still set");
+	same(AnswerList.get(a,1).t,10,"1 is still set");
+	same(Array.locate(1,a.list),-1,"unanswered list doesn't contain 1");
+	same(Array.locate(2,a.list),-1,"unanswered list doesn't contain 2");
+	ok(Array.locate(3,a.list)>-1,"unanswered list now contains 3");
+	ok(Array.locate(4,a.list)>-1,"unanswered list now contains 4");
+});
+
+test("removing answer in AnswerList",function(){
+	var a = new AnswerList(), turn = 7, candtoanswer = 5;
+	equals(typeof AnswerList.remove,"function","remove answer function exists");
+	ok(AnswerList.add(a,{
+		k: candtoanswer,
+		t: turn
+	}),"Answer is added before removal");
+	AnswerList.remove(a,candtoanswer);
+	same(AnswerList.get(a,candtoanswer).t,0,"Candidate is no longer answered at turn");
+	same(AnswerList.get(a,candtoanswer).p,0,"Candidate is no longer answered at position");
+	ok(Array.locate(candtoanswer,a.list)>-1,"unanswered list now contains candidate");
+});
+
+
+
+
+/**************/ module("PositionList"); /*******************************************************/
+
+var PositionList = SS.PositionList;
+
+test("instantiation",function(){
+	var squares = ["r1c1","r1c2","r1c3"]; p = new PositionList(squares);
+	ok(p instanceof PositionList,"PositionList is constructor");
+	console.log(p);
+	for (var i = 1; i <= 9; i++) {
+		var item = PositionList.get(p, i);
+		ok(item instanceof BlockList, "Item "+i+" is a BlockList");
+		same(item.items[squares[0]],0, "Item "+i+" has r1c1 item");
+		same(item.list.length, squares.length, "Item "+i+" has all listed");
+	}
+	equals(p.list.length,0,"has no candidates as available");
+});
+
+test("adding positionblock",function(){
+	var squares = ["r1c1","r1c2","r1c3"], p = new PositionList(squares), turn = 7, candtoanswer = 5, position = "r1c1";
+	equals(typeof PositionList.add,"function","add positionblock function exists");
+	same(PositionList.add(p,{
+		k: candtoanswer,
+		t: turn,
+		p: position
+	}),true,"adding positionblock returns true if successful");
+	var bl = PositionList.get(p,candtoanswer);
+	same(BlockList.get(bl,position),turn,"Cand is now blocked in that position in that turn.");
+	same(PositionList.add(p,{
+		k: candtoanswer,
+		t: turn + 1,
+		p: position
+	}),false,"answering a previously answered cand returns false");
+	same(BlockList.get(bl,position),turn,"answered candidate is still set to the turn where it was first answered");
+	same(p.list.length,0,"list of givens still is empty");
+	PositionList.add(p,{
+		k: candtoanswer,
+		t: turn,
+		p: "r1c2"
+	});
+	ok(Array.locate(candtoanswer,p.list)>-1,"list now doesn't contain candtoanswer");
+});
+
+test("reverting PositionList",function(){
+	var cand = 1, squares = ["r1c1","r1c2","r1c3"], p = new PositionList(squares);
+	PositionList.add(p,{
+		k: cand,
+		t: 10,
+		p: "p1"
+	});
+	PositionList.add(p,{
+		k: cand,
+		t: 11,
+		p: "p2"
+	});
+	PositionList.add(p,{
+		k: cand,
+		t: 12,
+		p: "p3"
+	});
+	PositionList.add(p,{
+		k: cand,
+		t: 13,
+		p: "p4"
+	});
+	PositionList.add(p,{
+		k: cand+1,
+		t: 10,
+		p: "p4"
+	});
+	equals(typeof PositionList.revert,"function","revert function exists");
+	PositionList.revert(p,11);
+	
+	var bl = PositionList.get(p,cand);
+	same(BlockList.get(bl,"p1"),10,"Cand is blocked in p1");
+	same(BlockList.get(bl,"p2"),11,"Cand is blocked in p2");
+	same(BlockList.get(bl,"p3"),0,"Cand is no longer blocked in p3");
+	same(BlockList.get(bl,"p4"),0,"Cand is no longer blocked in p4");
+	same(BlockList.get(PositionList.get(p,cand+1),"p4"),10,"Othercand is still blocked in p4");
+});
+
+test("removing answer in PositionList",function(){
+	var squares = ["r1c1","r1c2","r1c3"], p = new PositionList(undefined,squares), turn = 7, candtoanswer = 5, position = "r1c1";
+	equals(typeof PositionList.remove,"function","remove positionblock function exists");
+	same(PositionList.add(p,{
+		t: turn,
+		p: position,
+		k: candtoanswer
+	}),true,"adding was successful");
+	PositionList.remove(p,{
+		t: turn,
+		p: position,
+		k: candtoanswer
+	});
+	var bl = PositionList.get(p,candtoanswer);
+	same(BlockList.get(bl,position),0,"Cand is no longer blocked in that position in that turn.");
+});
+
+
+
 
 /**************/ module("Square"); /*******************************************************/
+
+var Square = SS.Square;
 
 test("instantiation",function(){
 	var s = new SS.Square(5,6);
 	ok(s instanceof SS.Square," Square is constructor");
-	ok(s.candList instanceof SS.CandList,"Square has a candidatelist");
-	ok(Array.compare(s.candList.cands,[666,0,0,0,0,0,0,0,0,0]),"Candlist has no blocks");
+	ok(s.candBlocks instanceof BlockList,"Square has a candidatelist");
+	same(s.candBlocks.list.length,9,"Candlist has 9 remaining");
+	ok(s.rowBlocks instanceof BlockList,"Square has a rowBlocks");
+	same(s.rowBlocks.list.length,9,"RowBlocks has 9 remaining");
+	ok(s.colBlocks instanceof BlockList,"Square has a colBlocks");
+	same(s.colBlocks.list.length,9,"colBlocks has 9 remaining");
+	ok(s.boxBlocks instanceof BlockList,"Square has a boxBlocks");
+	same(s.boxBlocks.list.length,9,"boxBlocks has 9 remaining");
+	ok(s.manBlocks instanceof BlockList,"Square has a manBlocks");
+	same(s.manBlocks.list.length,9,"manBlocks has 9 remaining");
 	equals(s.row,"r5","Square has row property");
 	equals(s.col,"c6","Square has col property");
 	equals(s.box,"b5","Square has box property");
-	ok($.isArray(s.neighbours),"Square has neighbourids array property");
-	equals((new SS.Square(1,3).box),"b1","r1c3 has box b1");
-	equals((new SS.Square(6,4).box),"b5","r6c4 has box b5");
-	equals((new SS.Square(7,7).box),"b9","r7c7 has box b9");
+	same(s.neighbours.prototype,[].prototype,"Square has neighbourids array property");
+	equals((new Square(1,3).box),"b1","r1c3 has box b1");
+	equals((new Square(6,4).box),"b5","r6c4 has box b5");
+	equals((new Square(7,7).box),"b9","r7c7 has box b9");
 	same(s.answeredCand,0,"new square has answeredCand 0");
 	same(s.answeredTurn,0,"new square has answeredTurn 0");
 });
 
 test("blocking candidate in square",function(){
-	var s = new SS.Square(1,1);
-	equals(typeof s.block,"function","Square has a block function");
-	same(s.block(5,6),SS.constants.EXECUTED,"block function returns success");
-	equals(s.candList.cands[5],6,"block function updated CandList");
-	same(s.block(5,6,true),SS.constants.REVERTED,"blocking same value toggles it back");
-	equals(typeof SS.Square.block,"function","block has static counterpart");
-	same(SS.Square.block(s,7,8),SS.constants.EXECUTED,"static block also returns success");
-	equals(s.candList.cands[7],8,"static block also calls CandList block");
-	s.answer(9,666);
-	same(SS.Square.block(s,1,667),SS.constants.NOACTION,"blocking candidate in already answered square fails");
+	var s = new Square(1,1), cand = 5, turn = 6;
+	equals(typeof Square.block,"function","Square has a block function");
+	same(Square.block(s,cand,turn,SS.constants.ROW),true,"block function returns success");
+	same(BlockList.is(s.rowBlocks,cand),true,"rowBlocks now is blocked");
+	same(s.rowBlocks.list.length,8,"rowBlocks now lists 8 remaining");
+	same(BlockList.is(s.candBlocks,cand),true,"candBlocks list now also has block for cand");
+	same(s.candBlocks.list.length,8,"candBlocks also now lists 8 remaining");
+	same(Square.block(s,cand,turn+1,SS.constants.ROW),false,"trying to block same again fails");
+/*
+	equals(s.candBlocks.cands[cand],1,"block function updated main BlockList in square");
+	equals(s.rowBlocks.cands[cand],turn,"block function updated rowBlocks list");
+	ok(!(s.colBlocks.cands[cand] || s.boxBlocks.cands[cand] || s.manBlocks.cands[cand]),"other lists was unaffected");
+	same(s.block(cand,turn+1,SS.constants.COL),SS.constants.ADDED,"blocking same cand in other targetlist returns added even though it was already blocked in other list");
+	equals(s.candBlocks.nbrBlocked,1,"main count is still 1 as same cand was blocked");
+	equals(s.candBlocks.cands[cand],2,"main list is now two for that cand");
+	equals(s.colBlocks.cands[cand],turn+1,"block function updated colBlocks list");
+	equals(SS.Square.block(s,cand,turn,SS.constants.ROW,SS.constants.REMOVE),SS.constants.REMOVED,"removing block returns REMOVED");
+	equals(s.candBlocks.nbrBlocked,1,"removing updated blockcount");
+	equals(s.candBlocks.cands[cand],1,"removing updates main block count");
+	equals(SS.Square.block(s,cand,turn,SS.constants.COL,SS.constants.TOGGLE),SS.constants.REMOVED,"toggling existing block away returns REMOVED since that cand no longer blocked");
+	equals(s.candBlocks.cands[cand],0,"toggling away updates main block count");
+	equals(SS.Square.block(s,cand,-1,SS.constants.COL,SS.constants.REMOVE),SS.constants.NOACTION,"removing nonexisting block returns NOACTION");
+	equals(SS.Square.block(s,cand,-1,SS.constants.COL,SS.constants.TOGGLE),SS.constants.ADDED,"toggling nonexisting block returns ADDED");
+	equals(SS.Square.block(s,cand,turn,SS.constants.COL,SS.constants.TOGGLE),SS.constants.NOACTION,"toggling block from first turn fails");
+	equals(SS.Square.block(s,cand,turn,SS.constants.COL,SS.constants.REMOVE),SS.constants.NOACTION,"removing block from first turn fails");	
+	ok(!(s.boxBlocks.cands[cand] || s.manBlocks.cands[cand]),"other lists was unaffected");
+	s.answeredCand = 1;
+	same(SS.Square.block(s,cand,turn,SS.constants.BOX,SS.constants.ADD),SS.constants.NOACTION,"blocking candidate in already answered square fails");
+*/
 });
 
 test("answering square",function(){
 	var s = new SS.Square(5,6),candtoanswer = 5, turn = 7;
 	equals(typeof s.answer,"function","Square has an answer function");	
-	same(s.answer(candtoanswer,turn),SS.constants.EXECUTED,"answer returns success");
+	same(s.answer(candtoanswer,turn),SS.constants.ADDED,"answer returns success");
 	equals(s.answeredCand,candtoanswer,"answeredCand now set to correct candidate");
 	equals(s.answeredTurn,turn,"answeredTurn now set to correct turn");
 	same(s.answer(candtoanswer,turn),SS.constants.NOACTION,"subsequent answers same turn fail");
@@ -158,36 +418,37 @@ test("answering square",function(){
 	s.block(candtoanswer,1);
 	same(s.answer(candtoanswer,2),SS.constants.NOACTION,"answering a blocked cand fails");
 	ok(!s.answeredCand,"square remains unanswered");
-	same(s.answer(candtoanswer+1,turn+1,true),SS.constants.EXECUTED,"answering with toggle flag works like normal if not previously answered");
-	same(s.answer(candtoanswer+1,turn+1,true),SS.constants.REVERTED,"new attempt to answer with toggle flag reverts to unanswered state");
+	same(s.answer(candtoanswer+1,turn+1,true),SS.constants.ADDED,"answering with toggle flag works like normal if not previously answered");
+	same(s.answer(candtoanswer+1,turn+1,true),SS.constants.REMOVED,"new attempt to answer with toggle flag reverts to unanswered state");
 	same(s.answeredCand,0,"square no longer has answeredCand");
 	same(s.answeredTurn,0,"square no longer has answeredTurn");
 	s = new SS.Square(3,2);
-	same(SS.Square.answer(s,candtoanswer,-1,true),SS.constants.EXECUTED,"answering with static function and toggle also works like normal");
+	same(SS.Square.answer(s,candtoanswer,-1,true),SS.constants.ADDED,"answering with static function and toggle also works like normal");
 	same(SS.Square.answer(s,candtoanswer,-1,true),SS.constants.NOACTION,"cannot toggle back answer from first turn");
 });
 
 test("reverting square",function(){
 	var s = new SS.Square(5,6);
 	equals(typeof s.revert,"function","Square has a revert function");
-	s.block(1,10);
-	s.block(2,11);
-	s.block(3,12);
-	s.answer(4,13);
-	equals(s.revert(20),false,"Reverting returns false if no change was made");
-	equals(s.revert(11),true,"Reverting returns true if no change was made");
+	s.block(1,10,SS.constants.ROW);
+	s.block(2,11,SS.constants.COL);
+	s.block(3,12,SS.constants.BOX);
+//	s.answer(4,13);
+	s.revert(11);
 	ok(!s.answeredCand,"Square is no longer answered");
-	ok(Array.compare([666,10,11,0,0,0,0,0,0,0],s.candList.cands),"candList of Square was reverted too");
+	console.log("after revert",s);
+	ok(Array.compare([666,1,1,0,0,0,0,0,0,0],s.candBlocks.cands),"candList of Square was reverted too");
+	equal(s.candBlocks.nbrBlocked,2,"reverting updated blockCount");
 });
 
 test("classname generation",function(){
-	var s = new SS.Square(1,1);
-	equals(typeof s.getClass,"function","Square has a getClass function");
-	equals(s.getClass(),"r1 c1 b1 canbe1 canbe2 canbe3 canbe4 canbe5 canbe6 canbe7 canbe8 canbe9","Starts with 'full' classname");
-	s.candList.block(6,777);
-	equals(s.getClass(),"r1 c1 b1 canbe1 canbe2 canbe3 canbe4 canbe5 canbe7 canbe8 canbe9","Doesn't include removed classes");
+	var s = new Square(1,1);
+	equals(typeof Square.getClass,"function","Square has a getClass function");
+	equals(Square.getClass(s),"r1 c1 b1 canbe1 canbe2 canbe3 canbe4 canbe5 canbe6 canbe7 canbe8 canbe9","Starts with 'full' classname");
+	s.candBlocks.block(6,777);
+	equals(Square.getClass(s),"r1 c1 b1 canbe1 canbe2 canbe3 canbe4 canbe5 canbe7 canbe8 canbe9","Doesn't include removed classes");
 	s.answeredCand = 5;
-	equals(s.getClass(),"r1 c1 b1 answered answer5","Answered square has special class");
+	equals(Square.getClass(s),"r1 c1 b1 answered answer5","Answered square has special class");
 });
 
 
@@ -221,17 +482,17 @@ test("blocking candidate in house",function(){
 	var h = new SS.House(),sqrid="r1c1",cand = 5, turn = 15;
 	h.add(sqrid);
 	equals(typeof h.block,"function","House has a block function");
-	same(h.block(cand,turn,sqrid),SS.constants.EXECUTED,"block function returns success if wasn't previously blocked in the house");
+	same(h.block(cand,turn,sqrid),SS.constants.ADDED,"block function returns success if wasn't previously blocked in the house");
 	same(h.block(cand,turn,sqrid),SS.constants.NOACTION,"block function returns noaction if was previously blocked same turn");
 	same(h.block(cand,turn+1,sqrid),SS.constants.NOACTION,"block function returns noaction if was previously blocked earlier turn");
 	equals(h.candPositions[cand][sqrid],turn,"Square is now marked as blocked for that candidate at that turn");	
 	equals(typeof SS.House.block,"function","block has static counterpart");
 	sqrid = "r2c2";
 	h.add("r2c2");
-	same(SS.House.block(h,cand,turn,sqrid),SS.constants.EXECUTED,"static block also returns success");
+	same(SS.House.block(h,cand,turn,sqrid),SS.constants.ADDED,"static block also returns success");
 	equals(h.candPositions[cand][sqrid],turn,"Static block also marked square as blocked for that candidate at that turn");
-	same(SS.House.block(h,cand,turn,sqrid,true),SS.constants.REVERTED,"block reverts previous block if toggle flag is true");
-	same(SS.House.block(h,cand+1,-1,sqrid,true),SS.constants.EXECUTED,"will block as normal with toggle flag set to true if not previously blocked");
+	same(SS.House.block(h,cand,turn,sqrid,true),SS.constants.REMOVED,"block reverts previous block if toggle flag is true");
+	same(SS.House.block(h,cand+1,-1,sqrid,true),SS.constants.ADDED,"will block as normal with toggle flag set to true if not previously blocked");
 	same(SS.House.block(h,cand+1,-1,sqrid,true),SS.constants.NOACTION,"cannot revert block done when sudoku was set (turn -1)");
 	equals(h.candPositions[cand+1][sqrid],-1,"First turn block is unaffected");
 });
@@ -239,7 +500,7 @@ test("blocking candidate in house",function(){
 test("answering cand in house",function(){
 	var h = new SS.House(),sqrid="r1c1",othersqrid="r2c2",cand = 5, othercand = 7, turn = 15;
 	equals(typeof h.answer,"function","House has an answer function");	
-	same(h.answer(cand,turn,sqrid),SS.constants.EXECUTED,"answer returns true if successful");
+	same(h.answer(cand,turn,sqrid),SS.constants.ADDED,"answer returns true if successful");
 	equals(h.answerPositions[cand],sqrid,"square now registered as answerpos for that cand");
 	equals(h.answeredCands[cand],turn,"answeredCands now set to correct turn for that candidate");
 	equals(h.answer(cand,turn,othersqrid),SS.constants.NOACTION,"subsequent answers of same cand in other square return false");
@@ -247,10 +508,10 @@ test("answering cand in house",function(){
 	h.block(othercand,turn,othersqrid);
 	equals(h.answer(othercand,turn+1,othersqrid),SS.constants.NOACTION,"answering cand in square thats already blocked returns false");
 	equals(typeof SS.House.answer,"function","House has static answer function too");
-	same(h.answer(cand,turn,sqrid,true),SS.constants.REVERTED,"if toggle is true, previous answer is reverted");
+	same(h.answer(cand,turn,sqrid,true),SS.constants.REMOVED,"if toggle is true, previous answer is reverted");
 	same(h.answeredCands[cand],0,"cand no longer has answerturn");
 	equals(h.answerPositions[cand],0,"cand no longer has answerposition");
-	same(SS.House.answer(h,cand,-1,sqrid,true),SS.constants.EXECUTED,"answering cand with toggle=true works as normal for nonextisting answer");
+	same(SS.House.answer(h,cand,-1,sqrid,true),SS.constants.ADDED,"answering cand with toggle=true works as normal for nonextisting answer");
 	equals(h.answeredCands[cand],-1,"answeredCands now set to correct turn for that candidate");	
 	same(SS.House.answer(h,cand,-1,sqrid,true),SS.constants.NOACTION,"answers made on the first turn cannot be reverted");
 });
@@ -310,7 +571,7 @@ test("candidate blocking",function(){
 	board.currentTurn = turn;
 	equals(typeof board.blockCandInSquare,"function","Board has blockCandInSquare function");
 	ok(!row.candPositions[cand][sqrid] && !col.candPositions[cand][sqrid] && !box.candPositions[cand][sqrid],"square is possible position for cand in all its houses");
-	same(board.blockCandInSquare(cand,sqrid),SS.constants.EXECUTED,"blocking returns success");
+	same(board.blockCandInSquare(cand,sqrid),SS.constants.ADDED,"blocking returns success");
 	same(board.blockCandInSquare(cand,sqrid),SS.constants.NOACTION,"repeated blocking fails");
 	equals(row.candPositions[cand][sqrid],turn,"square is blocked at this turn in its row");
 	equals(col.candPositions[cand][sqrid],turn,"square is blocked at this turn in its col");
@@ -318,7 +579,7 @@ test("candidate blocking",function(){
 	same(board.blockCandInSquare(cand,sqrid),SS.constants.NOACTION,"subsequent removal returns false");
 	equals(typeof SS.Board.blockCandInSquare,"function","There is static version of blockCandInSquare function");
 	board.free = true;
-	same(SS.Board.blockCandInSquare(board,cand,sqrid),SS.constants.REVERTED,"Blocking is reverted if board is in freemode");
+	same(SS.Board.blockCandInSquare(board,cand,sqrid),SS.constants.REMOVED,"Blocking is reverted if board is in freemode");
 	same(row.candPositions[cand][sqrid],0,"square is no longer blocked at this turn in its row");
 	same(col.candPositions[cand][sqrid],0,"square is blocked at this turn in its col");
 	same(box.candPositions[cand][sqrid],0,"square is blocked at this turn in its box");
@@ -329,7 +590,7 @@ test("answering a square",function(){
 		row = board.houses[square.row], col = board.houses[square.col], box = board.houses[square.box], turn = 666;
 	board.currentTurn = turn;
 	equals(typeof board.answerSquare,"function","Board has answerSquare function");
-	same(board.answerSquare(cand,sqrid),SS.constants.EXECUTED,"answering returns success");
+	same(board.answerSquare(cand,sqrid),SS.constants.ADDED,"answering returns success");
 	equal(square.answeredCand,cand,"Square is now answered as cand");
 	equal(square.answeredTurn,turn,"Square is answered in this turn");
 	equal(row.answeredCands[cand],turn,"Row has turn as answeredTurn for cand");
@@ -341,7 +602,7 @@ test("answering a square",function(){
 	equals(typeof SS.Board.answerSquare,"function","Board has static answerSquare function");
 	same(SS.Board.answerSquare(board,cand,sqrid),SS.constants.NOACTION,"subsequent answer returns noaction");
 	board.free = true;
-	same(SS.Board.answerSquare(board,cand,sqrid),SS.constants.REVERTED,"subsequent answer in freemode means reversal");
+	same(SS.Board.answerSquare(board,cand,sqrid),SS.constants.REMOVED,"subsequent answer in freemode means reversal");
 	equal(square.answeredCand,0,"Square is no longer answered as cand");
 	equal(square.answeredTurn,0,"Square no longer has answeredTurn");
 	equal(row.answeredCands[cand],0,"Row no longer has turn as answeredTurn for cand");

@@ -1,3 +1,5 @@
+/****************************** Array extras **************************************************/
+
 if(!Array.locate){
 	/**
 	 * locates a needle in a haystack
@@ -122,6 +124,22 @@ if (!Array.remove){
 	};
 }
 
+/****************************** Object extras **************************************************/
+
+if (!Object.keys){
+	Object.keys = function(obj){
+		var ret = [];
+		for(var k in obj){
+			if (obj.hasOwnProperty(k)){
+				ret.push(k);
+			}
+		}
+		return ret;
+	};
+}
+
+
+/****************************** Program!! :) **************************************************/
 
 (function ($){
 	
@@ -135,100 +153,161 @@ if (!Array.remove){
 	 */
 	var constants = {
 		NOACTION: "noaction",
-		REVERTED: "reverted",
-		EXECUTED: "executed"
+		NOMATTER: "nomatter",
+		REMOVED: "removed",
+		ADDED: "executed",
+		ADD: "add",
+		REMOVE: "remove",
+		TOGGLE: "toggle",
+		ROW: "row",
+		COL: "col",
+		BOX: "box",
+		MAN: "man"
 	};
 	SS.constants = constants;
+
+/****************************** Listmakermaker **************************************************/
 	
-/****************************** CandList class **************************************************/
+var ListMakerMaker = function(args){ // { defaultval(inst), isset(val,data), makeval(inst,data), listable(val), constrargsisdata }
+	var defaultkeys = [1,2,3,4,5,6,7,8,9], startdata, constructor = function(constrargs){
+		var keys = defaultkeys;
+		if (constrargs){
+			if (args.constrargsisdata) {
+				this.data = constrargs;
+			}
+			else {
+				this.keys = keys = constrargs;
+			}
+		}
+		this.items = {};
+		for(var i in keys){
+			this.items[keys[i]] = args.defaultval(this);
+		}
+		updatelist(this);
+	}, updatelist = function(inst){
+		var keys = inst.keys || defaultkeys;
+		inst.list = [];
+		for(var i=0;i<keys.length;i++){
+			if (args.listable(get(inst,keys[i]))){
+				inst.list.push(keys[i]);
+			}
+		}
+	}, revert = function(inst,data){
+		for(var key in inst.items){
+			if (!args.isset(get(inst,key),{
+				t: data
+			})){
+				constructor.remove(inst,key);
+			}
+		}
+	}, add = function(inst,data){ // data is {k: key} and some other stuff
+		if (!args.isset(inst.items[data.k],data)){
+			inst.items[data.k] = args.makeval(inst,data);
+			updatelist(inst);
+			return true;
+		}
+		return false;
+	}, remove = function(inst,key){
+		inst.items[key] = args.defaultval(inst);
+		updatelist(inst);
+	}, get = function(inst,key){
+		return inst.items[key];
+	};
+	constructor.revert = args.revert ? args.revert : revert;
+	constructor.add = add;
+	constructor.remove = args.remove ? args.remove : remove;
+	constructor.get = get;
+	constructor.is = function(inst,key,turn){
+		return args.isset(get(inst,key),{t:turn?turn:666666});
+	};
+	return constructor;
+};
+
+/******************************* BlockList class ************************************************/
 
 	/**
 	 * @constructor
-	 * @name CandList
-	 * @class A Candidate List object
-	 * @param {void|cands} optional cands array
+	 * @name BlockList
+	 * @class A Block List object
 	 */
-	var CandList = function(cands){
-		/**
-		 * array of candidates
-		 * @name CandList#cands
-		 * @type array
-		 */
-		this.cands = (cands ? cands : [666,0,0,0,0,0,0,0,0,0]);
-		/**
-		 * number of blocked candidates
-		 * @name CandList#nbrBlocked
-		 * @type int
-		 */
-		this.nbrBlocked = 0;
-		for(var i=10;--i;){
-			this.nbrBlocked += (this.cands[i] ? 1 : 0);
+	var BlockList = ListMakerMaker({
+		defaultval : function(inst){
+			return 0;
+		},
+		isset: function(val, data){
+			return val == -1 || (val <= data.t && val !== 0);
+		},
+		makeval: function(inst,data){
+			return data.t;
+		},
+		listable: function(val){
+			return val === 0;
 		}
-	};
+	});
+
+	SS.BlockList = BlockList;
 	
+/******************************* AnswerList class ************************************************/
+
 	/**
-	 * blocks a candidate, setting it to the given turn number
-	 * @param {int} cand The candidate to block
-	 * @param {int} turn The turn number to set it to
-	 * @param {boolean} toggle Whether or not to toggle already blocked value back to unblocked
-	 * @returns {boolean} Whether or not the cand was blocked
+	 * @constructor
+	 * @name AnswerList
+	 * @class An AnswerList object
 	 */
-	CandList.prototype.block = function(cand,turn,toggle){
-		return CandList.block(this,cand,turn,toggle);
-	};
-	
-	/**
-	 * blocks a candidate, setting it to the given turn number
-	 * @param {CandList} list The CandList to operate on
-	 * @param {int} cand The candidate to block
-	 * @param {int} turn The turn number to set it to
-	 * @param {boolean} toggle Whether or not to toggle back to unblocked if already blocked
-	 * @returns {int} 1 if blocked, -1 if toggled to unblocked, 0 if was already blocked and no toggle
-	 */	
-	CandList.block = function(list,cand,turn,toggle){
-		if (list.cands[cand]){
-			if (toggle && list.cands[cand] != -1){
-				list.cands[cand] = 0;
-				list.nbrBlocked -= 1;
-				return constants.REVERTED;
-			}
-			return constants.NOACTION;
+	var AnswerList = ListMakerMaker({
+		defaultval : function(inst){
+			return {t:0,p:0};
+		},
+		isset: function(val, data){
+			return val.t == -1 || (val.t <= data.t && val.t !== 0);
+		},
+		makeval: function(inst,data){
+			return {t:data.t,p:data.p};
+		},
+		listable: function(val){
+			return val.t === 0;
 		}
-		list.cands[cand] = turn;
-		list.nbrBlocked += 1;
-		return constants.EXECUTED;
-	};
-	
+	});
+
+	SS.AnswerList = AnswerList;
+
+
+/******************************* PositionList class ************************************************/
+
 	/**
-	 * reverts status back to a given turn
-	 * @param {int} turn The turn number to revert it to
-	 * @returns {boolean} Whether or not the revert meant any changes
-	 */	
-	CandList.prototype.revert = function(turn){
-		return CandList.revert(this,turn);
-	};
-	
-	/**
-	 * Static version, reverts status back to a given turn
-	 * @param {CandList} list The CandList to operate on
-	 * @param {int} turn The turn number to revert it to
-	 * @returns {boolean} Whether or not the revert meant any changes
-	 */	
-	CandList.revert = function(list,turn){
-		var oldNbrBlocked = list.nbrBlocked;
-		list.nbrBlocked = 0;
-		for(var i=10;--i;){
-			if (list.cands[i]>turn){
-				list.cands[i] = 0;
+	 * @constructor
+	 * @name PositionList
+	 * @class A PositionList object
+	 */
+	var PositionList = ListMakerMaker({
+		defaultval : function(inst){
+			return new BlockList(inst.data);
+		},
+		isset: function(val, data){ // val is BlockList with position keys, data is {k,p,t}
+		    var current = val.items[data.p];
+			return current == -1 || (current <= data.t && current !== 0);
+		},
+		makeval: function(inst,data){ // data is {k,p,t}
+			BlockList.add(inst.items[data.k],{k:data.p,t:data.t});
+			return inst.items[data.k];
+		},
+		listable: function(val){
+			return val.list.length === 1;
+		},
+		revert: function(inst,data){
+			for(var key in inst.items){
+				BlockList.revert(inst.items[key],data);
 			}
-			list.nbrBlocked += (list.cands[i] ? 1 : 0);
-		}
-		return list.nbrBlocked != oldNbrBlocked;
-	};
-	
-	
-	SS.CandList = CandList;
-	
+		},
+		remove: function(inst,data){ // data is {k,p,t}
+			BlockList.remove(inst.items[data.k],data.p);
+		},
+		constrargsisdata: true
+	});
+
+	SS.PositionList = PositionList;
+
+
 /******************************** Square ******************************************************/	
 
 	/**
@@ -271,10 +350,34 @@ if (!Array.remove){
 		this.neighbours = [];
 		/**
 		 * CandList of remaining candidates
-		 * @name Square#candList
+		 * @name Square#candBlocks
 		 * @type CandList
 		 */
-		this.candList = new CandList();
+		this.candBlocks = new BlockList();
+		/**
+		 * CandList of remaining candidates in row
+		 * @name Square#rowBlocks
+		 * @type CandList
+		 */
+		this.rowBlocks = new BlockList();
+		/**
+		 * CandList of remaining candidates in col
+		 * @name Square#colBlocks
+		 * @type CandList
+		 */
+		this.colBlocks = new BlockList();
+		/**
+		 * CandList of remaining candidates in box
+		 * @name Square#boxBlocks
+		 * @type CandList
+		 */
+		this.boxBlocks = new BlockList();
+		/**
+		 * CandList of remaining candidates not blocked by user
+		 * @name Square#manBlocks
+		 * @type CandList
+		 */
+		this.manBlocks = new BlockList();
 		/**
 		 * turn in which square was given an answer
 		 * @name Square#answeredTurn
@@ -290,14 +393,6 @@ if (!Array.remove){
 	};
 	
 	/**
-	 * returns the CSS class string, which depends on available cands
-	 * @returns {string} the CSS class
-	 */
-	Square.prototype.getClass = function(){
-		return Square.getClass(this);
-	};
-	
-	/**
 	 * Static version, CSS class string, which depends on available cands
 	 * @param {Square} square the square to work with
 	 * @returns {string} the CSS class
@@ -306,7 +401,7 @@ if (!Array.remove){
 		var ret = square.row+" "+square.col+" "+square.box+" ";
 		if (!square.answeredCand) {
 			for (var i = 0; ++i < 10;) {
-				if (!square.candList.cands[i]) {
+				if (!BlockList.is(square.candBlocks,i)) {
 					ret += "canbe" + i + " ";
 				}
 			}
@@ -318,15 +413,15 @@ if (!Array.remove){
 		return ret;
 	};
 
+
 	/**
-	 * blocks a candidate, setting it to the given turn number
-	 * @param {int} cand The candidate to block
-	 * @param {int} turn The turn number to set it to
-	 * @param {boolean} toggle Whether or not to toggle back already
-	 * @returns {boolean} Whether or not the cand was blocked
-	 */
-	Square.prototype.block = function(cand,turn,toggle){
-		return Square.block(this,cand,turn,toggle);
+	 * tests if a square is blocked for a given cand (or answered)
+	 * @param {Square} square The Square to operate on
+	 * @param {int} cand The candidate to test
+	 * @returns {boolean} Whether or not that square is blocked
+	 */	
+	Square.isblocked = function(square,cand){
+		return square.answeredTurn || BlockList.is(square.candBlocks,{k:cand,t:turn});
 	};
 	
 	/**
@@ -334,76 +429,96 @@ if (!Array.remove){
 	 * @param {Square} square The Square to operate on
 	 * @param {int} cand The candidate to block
 	 * @param {int} turn The turn number to set it to
-	 * @param {boolean} toggle Whether or not to toggle back already
-	 * @returns {boolean} Whether or not the cand was blocked
+	 * @param {string target Which list to block in (row/col/box/man)
+	 * @returns {boolean} Whether or not adding made difference
 	 */	
-	Square.block = function(square,cand,turn,toggle){
+	Square.block = function(square,cand,turn,target){
 		if (square.answeredCand){
-			return constants.NOACTION;
+			return false;
 		}
-		return CandList.block(square.candList,cand,turn,toggle);
+		var targetList = (target == constants.ROW ? square.rowBlocks : 
+		                 target == constants.COL ? square.colBlocks : 
+						 target == constants.BOX ? square.boxBlocks : 
+						 square.manBlocks);
+		BlockList.add(targetList,{t:turn,k:cand});
+		return BlockList.add(square.candBlocks,{t:turn,k:cand});
 	};
 	
 	/**
-	 * reverts status back to a given turn
-	 * @param {int} turn The turn number to revert it to
-	 * @returns {boolean} Whether or not the revert meant any changes
+	 * unblocks a candidate
+	 * @param {Square} square The Square to operate on
+	 * @param {int} cand The candidate to unblock
+	 * @param {string target Which list to unblock in (row/col/box/man)
+	 * @returns {boolean} Whether or not removing made difference in square
 	 */	
-	Square.prototype.revert = function(turn){
-		return Square.revert(this,turn);
+	Square.unblock = function(square,cand,target){
+		if (square.answeredCand){
+			return false; // square is answered, blockremoving is irrelevant
+		}
+		var targetList = (target == constants.ROW ? square.rowBlocks : 
+		                  target == constants.COL ? square.colBlocks : 
+						  target == constants.BOX ? square.boxBlocks : 
+						  square.manBlocks);
+		if (!BlockList.remove(targetList,cand)){
+			return false; // this block didn't exist, no change
+		}
+		if (!BlockList.is(square.rowBlocks,cand) && !BlockList.is(square.colBlocks,cand) && !BlockList.is(square.boxBlocks,cand) && !BlockList.is(square.manBlocks,cand)){
+			BlockList.remove(square.candBlocks,cand);
+			return true; // last block in square was removed, cand is now available!
+		}
+		return false; // other blocks remain, no change
 	};
+	
 	
 	/**
 	 * Static version, reverts status back to a given turn
 	 * @param {Square} list The Square to operate on
 	 * @param {int} turn The turn number to revert it to
-	 * @returns {boolean} Whether or not the revert meant any changes
 	 */	
 	Square.revert = function(square,turn){
-		var oldAnsweredTurn = square.answeredTurn;
+		// removing answer
 		if (square.answeredTurn>turn){
 			square.answeredTurn = 0;
 			square.answeredCand = 0;
 		}
-		return CandList.revert(square.candList,(turn)) || (oldAnsweredTurn && !square.answeredTurn);
+		// removing blocks
+		BlockList.revert(square.rowBlocks,turn);
+		BlockList.revert(square.colBlocks,turn);
+		BlockList.revert(square.boxBlocks,turn);
+		BlockList.revert(square.manBlocks,turn);
+		// update blocksummary
+		BlockList.revert(square.candBlocks,turn);
 	};
 
 	/**
 	 * Sets square answer as given candidate at given turn
-	 * @param {int} cand The cand to set it to
-	 * @param {int} turn The turn number to revert it to
-	 * @param {boolean} toggle Whether or not to toggle back answer
-	 * @returns {int} Action code according to constant
-	 */	
-	Square.prototype.answer = function(cand,turn,toggle){
-		return Square.answer(this,cand,turn,toggle);
-	};
-	
-	/**
-	 * Static version, sets square answer as given candidate at given turn
 	 * @param {Square} square The square to operate on
 	 * @param {int} cand The cand to set it to
 	 * @param {int} turn The turn number to revert it to
 	 * @returns {int} Action code according to constant
 	 */	
-	Square.answer = function(square,cand,turn,toggle){
-		if (square.candList.cands[cand]){ // that cand is blocked
-			return constants.NOACTION;
+	Square.answer = function(square,cand,turn){
+		if (Square.isblocked(square.candBlocks,cand)){ // that cand is blocked or answered
+			return false;
 		} 
-		if (square.answeredCand){ // square already answered
-			if (toggle && square.answeredTurn != -1){
-				square.answeredTurn = 0;
-				square.answeredCand = 0;
-				return constants.REVERTED;
-			}
-			return constants.NOACTION;
-		}
 		square.answeredTurn = turn;
 		square.answeredCand = cand;
-		return constants.EXECUTED;
+		return true;
 	};
 
-
+	/**
+	 * unsets answer
+	 * @param {Square} square The square to operate on
+	 * @returns {bool} Whether or not an answer was removed
+	 */	
+	Square.unanswer = function(square){
+		if (square.answeredTurn === 0){ // square didn't have answer
+			return false;
+		} 
+		square.answeredTurn = 0;
+		square.answeredCand = 0;
+		return true;
+	};
 
 	SS.Square = Square;
 
@@ -494,12 +609,12 @@ if (!Array.remove){
 		if (house.candPositions[cand][sqrid]){
 			if (toggle && house.candPositions[cand][sqrid] != -1){
 				house.candPositions[cand][sqrid] = 0;
-				return constants.REVERTED;
+				return constants.REMOVED;
 			}
 			return constants.NOACTION;
 		}
 		house.candPositions[cand][sqrid] = turn;
-		return constants.EXECUTED;
+		return constants.ADDED;
 	};
 	
 	/**
@@ -528,7 +643,7 @@ if (!Array.remove){
 			if (toggle && house.answeredCands[cand] != -1){
 				house.answeredCands[cand] = 0;
 				house.answerPositions[cand] = 0;
-				return constants.REVERTED;
+				return constants.REMOVED;
 			}
 			return constants.NOACTION;
 		}
@@ -542,7 +657,7 @@ if (!Array.remove){
 		}
 		house.answeredCands[cand] = turn;
 		house.answerPositions[cand] = sqrid;
-		return constants.EXECUTED;
+		return constants.ADDED;
 	};
 
 	/**
