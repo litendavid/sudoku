@@ -22,7 +22,7 @@ test("Array extra methods are declared",function(){
 
 test("compare function",function(){
 	ok(Array.compare([1,2,3],[1,2,3]),"should return true if arrays are identical");
-	ok(!Array.compare([1,2,3],[4,5,6]),"should return false if differnet members");
+	ok(!Array.compare([1,2,3],[4,5,6]),"should return false if differenet members");
 	ok(!Array.compare([1,2,3],[1,2,3,3]),"should return false if 2nd is same but has more members");
 	ok(!Array.compare([1,2,3],[3,2,1]),"should return false if same but different order");
 });
@@ -378,6 +378,7 @@ test("blocking candidate in square",function(){
 	same(BlockList.is(s.rowBlocks,cand),true,"rowBlocks now is blocked");
 	same(s.rowBlocks.list.length,8,"rowBlocks now lists 8 remaining");
 	same(BlockList.is(s.candBlocks,cand),true,"candBlocks list now also has block for cand");
+	same(Square.isblocked(s,cand),true,"isblocked now returns true for that cand");
 	same(s.candBlocks.list.length,8,"candBlocks also now lists 8 remaining");
 	same(Square.block(s,cand,turn+1,SS.constants.ROW),false,"trying to block same again fails");
 /*
@@ -401,6 +402,19 @@ test("blocking candidate in square",function(){
 	s.answeredCand = 1;
 	same(SS.Square.block(s,cand,turn,SS.constants.BOX,SS.constants.ADD),SS.constants.NOACTION,"blocking candidate in already answered square fails");
 */
+});
+
+test("unblocking candidate in square",function(){
+	var s = new Square(1,1), cand = 5, turn = 6;	
+	equals(typeof Square.unblock,"function","Square has an unblock function");
+	same(Square.unblock(s,cand,SS.constants.ROW),false,"unblocking never blocked cand returns false");
+	ok(Square.block(s,cand,turn,SS.constants.ROW),"blocking row worked");
+	ok(Square.block(s,cand,turn,SS.constants.COL),"blocking col worked");
+	same(BlockList.is(s.rowBlocks,cand),true,"rowBlocks now is blocked");
+	same(BlockList.is(s.colBlocks,cand),true,"colBlocks now is blocked");
+	ok(Square.isblocked(s,cand),"Square is now blocked");
+	same(Square.unblock(s,cand,SS.constants.ROW),false,"unblocking previously blocked cand returns false if other blocks remain");
+	same(Square.unblock(s,cand,SS.constants.COL),true,"unblocking previously blocked cand returns true cand now unblocked in square");
 });
 
 test("answering square",function(){

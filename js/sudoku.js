@@ -166,7 +166,7 @@ if (!Object.keys){
 	};
 	SS.constants = constants;
 
-/****************************** Listmakermaker **************************************************/
+/****************************** Listmakermaker ***************************************************/
 	
 var ListMakerMaker = function(args){ // { defaultval(inst), isset(val,data), makeval(inst,data), listable(val), constrargsisdata }
 	var defaultkeys = [1,2,3,4,5,6,7,8,9], startdata, constructor = function(constrargs){
@@ -208,8 +208,12 @@ var ListMakerMaker = function(args){ // { defaultval(inst), isset(val,data), mak
 		}
 		return false;
 	}, remove = function(inst,key){
+		if (!args.isset(get(inst,key),{t:666666666})){
+			return false;
+		}
 		inst.items[key] = args.defaultval(inst);
 		updatelist(inst);
+		return true;
 	}, get = function(inst,key){
 		return inst.items[key];
 	};
@@ -421,7 +425,7 @@ var ListMakerMaker = function(args){ // { defaultval(inst), isset(val,data), mak
 	 * @returns {boolean} Whether or not that square is blocked
 	 */	
 	Square.isblocked = function(square,cand){
-		return square.answeredTurn || BlockList.is(square.candBlocks,{k:cand,t:turn});
+		return square.answeredTurn || BlockList.is(square.candBlocks,cand);
 	};
 	
 	/**
@@ -453,20 +457,25 @@ var ListMakerMaker = function(args){ // { defaultval(inst), isset(val,data), mak
 	 */	
 	Square.unblock = function(square,cand,target){
 		if (square.answeredCand){
-			return false; // square is answered, blockremoving is irrelevant
+			return "alreadyanswered,idiot"; // square is answered, blockremoving is irrelevant
 		}
 		var targetList = (target == constants.ROW ? square.rowBlocks : 
 		                  target == constants.COL ? square.colBlocks : 
 						  target == constants.BOX ? square.boxBlocks : 
 						  square.manBlocks);
+		var msg = (target == constants.ROW ? "row" : 
+		                  target == constants.COL ? "col" : 
+						  target == constants.BOX ? "box" : 
+						  "man");
+console.log(square,msg,targetList);
 		if (!BlockList.remove(targetList,cand)){
-			return false; // this block didn't exist, no change
+			return "no block existed, moron"; // this block didn't exist, no change
 		}
 		if (!BlockList.is(square.rowBlocks,cand) && !BlockList.is(square.colBlocks,cand) && !BlockList.is(square.boxBlocks,cand) && !BlockList.is(square.manBlocks,cand)){
 			BlockList.remove(square.candBlocks,cand);
-			return true; // last block in square was removed, cand is now available!
+			return "weee, no longer blocked!"; // last block in square was removed, cand is now available!
 		}
-		return false; // other blocks remain, no change
+		return "removed, but others remain"; // other blocks remain, no change
 	};
 	
 	
